@@ -1,0 +1,29 @@
+{
+  "name": "mcpman",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "mkdir -p dist && bun build --compile --outfile dist/mcpman index.ts",
+    "dev": "bun --hot index.ts",
+    "cli": "bun index.ts",
+    "test": "bun run typecheck && vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint ./src ./index.ts",
+    "format": "biome format --write ./src ./index.ts",
+    "check": "biome check --write ./src ./index.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.4",
+    "@types/bun": "latest",
+    "vitest": "^3.2.4"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.2",
+    "cmd-ts": "^0.14.2",
+    "zod": "^3.23.8"
+  }
+}

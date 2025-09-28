@@ -1,0 +1,30 @@
+repos:
+  - repo: local
+    hooks:
+      - id: lint
+        name: Lint with Biome
+        entry: bun run lint
+        language: system
+        files: \.(ts|js|tsx|jsx|json)$
+        pass_filenames: false
+
+      - id: typecheck
+        name: TypeScript Type Check
+        entry: bun run typecheck
+        language: system
+        files: \.(ts|tsx)$
+        pass_filenames: false
+
+      - id: format
+        name: Format with Biome
+        entry: bun run format
+        language: system
+        files: \.(ts|js|tsx|jsx|json)$
+        pass_filenames: false
+
+      - id: test
+        name: Run Tests
+        entry: bun test
+        language: system
+        pass_filenames: false
+        stages: [pre-push]

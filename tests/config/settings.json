@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "servers": {
+    "filesystem": {
+      "transport": "stdio",
+      "command": "npx",
+      "args": ["@modelcontextprotocol/server-filesystem"],
+      "env": {},
+      "disabled": false,
+      "timeout": 30000
+    }
+  },
+  "logging": {
+    "level": "error"
+  }
+}

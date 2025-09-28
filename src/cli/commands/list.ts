@@ -1,6 +1,6 @@
 import { command } from "cmd-ts";
 import { loadConfig } from "../../config/loader.js";
-import { ClientManager } from "../../mcp/client-manager.js";
+import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
 
 export const listCommand = command({
   name: "list",
@@ -9,7 +9,7 @@ export const listCommand = command({
   handler: async () => {
     try {
       const config = await loadConfig();
-      const clientManager = new ClientManager(config);
+      const upstreamServerManager = new UpstreamServerManager(config);
 
       console.log("MCPMan Server Configuration\n");
 
@@ -36,9 +36,9 @@ export const listCommand = command({
       }
 
       console.log("\nConnecting to servers...");
-      await clientManager.connectAll();
+      await upstreamServerManager.connectAll();
 
-      const toolMap = await clientManager.getAllTools();
+      const toolMap = await upstreamServerManager.getAllTools();
 
       console.log("\nAvailable Tools:\n");
 
@@ -54,7 +54,7 @@ export const listCommand = command({
         console.log("");
       }
 
-      await clientManager.disconnect();
+      await upstreamServerManager.disconnect();
     } catch (error) {
       console.error(
         `Failed to list servers: ${error instanceof Error ? error.message : String(error)}`

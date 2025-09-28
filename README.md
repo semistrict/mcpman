@@ -34,17 +34,20 @@ bun cli add filesystem --command npx --args @modelcontextprotocol/server-filesys
 bun cli add api-server --url https://api.example.com/mcp
 ```
 
-### Evaluate JavaScript with MCP Tools
+### Evaluate Function Expressions with MCP Tools
 
 ```bash
-# Use default root directory (current directory)
-bun cli eval "filesystem.listFiles({ path: '.' })"
+# Simple function with no arguments
+bun cli eval "() => listServers()"
+
+# Function with argument
+bun cli eval "(arg) => filesystem.listFiles({ path: arg.directory })" --arg '{"directory": "."}'
 
 # Specify custom root directories
-bun cli eval "filesystem.listFiles({ path: '/tmp' })" --roots /tmp --roots /var
+bun cli eval "(arg) => filesystem.listFiles({ path: arg.path })" --arg '{"path": "/tmp"}' --roots /tmp
 
-# Access multiple servers
-bun cli eval "const files = filesystem.listFiles({ path: '.' }); console.log(files);"
+# Complex function with console output
+bun cli eval "(arg) => { console.log('Processing:', arg.name); return arg.value * 2; }" --arg '{"name": "test", "value": 21}'
 ```
 
 ### Run as MCP Server
@@ -112,8 +115,8 @@ bun cli validate                      # Validate configuration
 bun cli test                          # Test server connections
 
 # Execution
-bun cli eval "code" [--roots /path]   # Execute JavaScript with MCP tools
-bun cli serve                         # Run as MCP server
+bun cli eval "function-expr" [--arg '{}'] [--roots /path]   # Execute function expression with MCP tools
+bun cli serve                                               # Run as MCP server
 
 # Authentication
 bun cli auth <server-name>            # Authenticate with OAuth server
@@ -121,18 +124,29 @@ bun cli auth <server-name>            # Authenticate with OAuth server
 
 ## JavaScript Execution Environment
 
-In the eval environment, each configured server is available as a global object:
+In the eval environment, each configured server is available as a global object. All code must be provided as function expressions:
 
 ```javascript
-// List files using filesystem server
-const files = await filesystem.listFiles({ path: "." });
+// No argument function - list servers
+() => listServers()
 
-// Use multiple servers
-const servers = listServers();
-console.log("Available servers:", servers);
+// Function with argument - list files
+(arg) => filesystem.listFiles({ path: arg.directory })
 
-// Access tools dynamically
-const result = await someServer.someTool({ param: "value" });
+// Complex function with multiple operations
+(arg) => {
+  console.log("Processing directory:", arg.path);
+  const files = filesystem.listFiles({ path: arg.path });
+  return files.filter(f => f.name.endsWith('.js'));
+}
+
+// Async function with multiple server calls
+async (arg) => {
+  const servers = listServers();
+  console.log("Available servers:", servers);
+  const result = await someServer.someTool({ param: arg.value });
+  return result;
+}
 ```
 
 ## Development

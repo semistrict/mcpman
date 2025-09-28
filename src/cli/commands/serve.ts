@@ -1,8 +1,13 @@
 import { command } from "cmd-ts";
 import { loadConfig } from "../../config/loader.js";
 import { EvalRuntime } from "../../eval/runtime.js";
-import { ClientManager } from "../../mcp/client-manager.js";
-import { MCPServer } from "../../mcp/server.js";
+import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
+import {
+  createMcpServer,
+  connectMcpServer,
+  disconnectMcpServer,
+  getMcpServer,
+} from "../../mcp/server.js";
 
 export const serveCommand = command({
   name: "serve",
@@ -13,22 +18,20 @@ export const serveCommand = command({
       // Load configuration
       const config = await loadConfig();
 
-      // Initialize client manager and connect to all servers
-      const clientManager = new ClientManager(config);
-      await clientManager.connectAll();
+      // Initialize client manager
+      const upstreamServerManager = new UpstreamServerManager(config);
 
       // Initialize eval runtime
-      const evalRuntime = new EvalRuntime(clientManager);
+      const evalRuntime = new EvalRuntime(upstreamServerManager);
 
       // Create MCP server
-      const mcpServer = new MCPServer();
-      mcpServer.setDependencies(evalRuntime, clientManager);
+      createMcpServer(evalRuntime, upstreamServerManager);
 
       // Handle graceful shutdown
       const shutdown = async () => {
         console.error("Shutting down...");
-        await mcpServer.close();
-        await clientManager.disconnect();
+        await disconnectMcpServer();
+        await upstreamServerManager.disconnect();
         process.exit(0);
       };
 
@@ -37,7 +40,16 @@ export const serveCommand = command({
 
       // Start the server
       console.error("MCPMan server starting...");
-      await mcpServer.listen();
+      await connectMcpServer();
+
+      // Set up roots provider now that MCP server is ready
+      upstreamServerManager.setRootsProvider(async () => {
+        const mcpServer = await getMcpServer();
+        const result = await mcpServer.server.listRoots();
+        return result.roots;
+      });
+
+      // Upstream servers will be connected when client initializes (see oninitialized callback)
     } catch (error) {
       console.error(
         `Failed to start server: ${error instanceof Error ? error.message : String(error)}`

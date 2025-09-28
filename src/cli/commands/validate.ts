@@ -1,6 +1,6 @@
 import { command } from "cmd-ts";
 import { ConfigError, loadConfig } from "../../config/loader.js";
-import { ClientManager } from "../../mcp/client-manager.js";
+import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
 
 export const validateCommand = command({
   name: "validate",
@@ -15,7 +15,7 @@ export const validateCommand = command({
 
       // Test server connections
       console.log("\nTesting server connections...");
-      const clientManager = new ClientManager(config);
+      const upstreamServerManager = new UpstreamServerManager(config);
 
       const serverNames = Object.keys(config.servers).filter(
         (name) => !config.servers[name]?.disabled
@@ -27,11 +27,11 @@ export const validateCommand = command({
       }
 
       // Connect to all servers
-      await clientManager.connectAll();
+      await upstreamServerManager.connectAll();
 
       // Check each server
       for (const serverName of serverNames) {
-        const client = clientManager.getClient(serverName);
+        const client = upstreamServerManager.getClient(serverName);
         if (client) {
           try {
             // Try to list tools to verify connection
@@ -48,7 +48,7 @@ export const validateCommand = command({
       }
 
       // Clean up connections
-      await clientManager.disconnect();
+      await upstreamServerManager.disconnect();
     } catch (error) {
       if (error instanceof ConfigError) {
         console.error(`Configuration error: ${error.message}`);

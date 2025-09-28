@@ -1,6 +1,6 @@
 import { command, positional, string } from "cmd-ts";
 import { loadConfig } from "../../config/loader.js";
-import { ClientManager } from "../../mcp/client-manager.js";
+import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
 
 export const testCommand = command({
   name: "test",
@@ -45,13 +45,13 @@ export const testCommand = command({
       }
 
       // Test connection
-      const clientManager = new ClientManager(config);
-      await clientManager.connectAll();
+      const upstreamServerManager = new UpstreamServerManager(config);
+      await upstreamServerManager.connectAll();
 
-      const client = clientManager.getClient(serverName);
+      const client = upstreamServerManager.getClient(serverName);
       if (!client) {
         console.log("✗ Failed to connect");
-        await clientManager.disconnect();
+        await upstreamServerManager.disconnect();
         return;
       }
 
@@ -76,7 +76,7 @@ export const testCommand = command({
         );
       }
 
-      await clientManager.disconnect();
+      await upstreamServerManager.disconnect();
     } catch (error) {
       console.error(`Test failed: ${error instanceof Error ? error.message : String(error)}`);
       process.exit(1);

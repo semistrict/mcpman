@@ -1,16 +1,24 @@
 import { command, positional, string, option } from "cmd-ts";
 import { loadConfig } from "../../config/loader.js";
 import { EvalRuntime } from "../../eval/runtime.js";
-import { ClientManager } from "../../mcp/client-manager.js";
+import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
 
 export const evalCommand = command({
   name: "eval",
-  description: "Evaluate JavaScript code with access to MCP tools",
+  description: "Evaluate an IIFE with access to MCP tools and a parameter object",
   args: {
     code: positional({
       type: string,
-      displayName: "code",
-      description: "JavaScript code to evaluate",
+      displayName: "function",
+      description:
+        "Function expression that optionally accepts a single parameter (e.g., '(arg) => arg.value * 2')",
+    }),
+    arg: option({
+      type: string,
+      long: "arg",
+      short: "a",
+      description: "JSON object to pass as parameter to the IIFE",
+      defaultValue: () => "{}",
     }),
     roots: option({
       type: string,
@@ -22,14 +30,22 @@ export const evalCommand = command({
     }),
   },
   handler: async (args) => {
-    const code = args.code;
-
     try {
+      // Parse the arg argument as JSON
+      let argValue: unknown;
+      try {
+        argValue = JSON.parse(args.arg);
+      } catch (error) {
+        throw new Error(
+          `Invalid JSON in --arg argument: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+
       // Load configuration
       const config = await loadConfig();
 
       // Initialize client manager with roots provider
-      const clientManager = new ClientManager(config, async () => {
+      const upstreamServerManager = new UpstreamServerManager(config, async () => {
         const rootDirs = args.roots
           .split(",")
           .map((dir) => dir.trim())
@@ -39,13 +55,13 @@ export const evalCommand = command({
           name: rootPath,
         }));
       });
-      await clientManager.connectAll();
+      await upstreamServerManager.connectAll();
 
       // Initialize eval runtime
-      const evalRuntime = new EvalRuntime(clientManager);
+      const evalRuntime = new EvalRuntime(upstreamServerManager);
 
-      // Execute the code
-      const { result, output } = await evalRuntime.eval(code);
+      // Execute the function expression with the argument
+      const { result, output } = await evalRuntime.eval(args.code, argValue);
 
       // Output console logs/errors first
       if (output) {
@@ -61,7 +77,7 @@ export const evalCommand = command({
         }
       }
 
-      await clientManager.disconnect();
+      await upstreamServerManager.disconnect();
       process.exit(0);
     } catch (error) {
       console.error(`Eval failed: ${error instanceof Error ? error.message : String(error)}`);

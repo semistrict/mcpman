@@ -1,13 +1,13 @@
 import vm from "node:vm";
-import type { ClientManager } from "../mcp/client-manager.js";
+import type { UpstreamServerManager } from "../mcp/upstream-server-manager.js";
 import { createGlobalContext, createServerProxies } from "./proxy.js";
 
 export class EvalRuntime {
   private vmContext: vm.Context | null = null;
 
-  constructor(private clientManager: ClientManager) {}
+  constructor(private upstreamServerManager: UpstreamServerManager) {}
 
-  async eval(code: string): Promise<{ result: unknown; output: string }> {
+  async eval(code: string, arg: unknown = {}): Promise<{ result: unknown; output: string }> {
     // Initialize VM context if not already created
     if (!this.vmContext) {
       await this.initializeContext();
@@ -36,45 +36,20 @@ export class EvalRuntime {
     };
 
     // Run the code and capture the result
-    let result: unknown;
-    // For simple expressions, try evaluating directly
-    if (
-      !code.includes(";") &&
-      !code.includes("\n") &&
-      !code.match(/^\s*(let|const|var|function|class|if|for|while)\s/)
-    ) {
-      result = await vm.runInContext(`(async () => { return ${code}; })()`, this.vmContext, {
+    // Treat code as a function expression and call it with the arg
+    this.vmContext.__evalArg = arg;
+    let result = await vm.runInContext(
+      `(async () => {
+      const fn = ${code};
+      return await fn(__evalArg);
+    })()`,
+      this.vmContext,
+      {
         timeout: 30000,
-      });
-    } else {
-      // For statements, try to return the last expression if possible
-      // Split by both newlines and semicolons to find statements
-      const statements = code
-        .trim()
-        .split(/[;\n]/)
-        .map((s) => s.trim())
-        .filter((s) => s);
-      const lastStatement = statements[statements.length - 1] || "";
-
-      // If the last statement looks like an expression, try to return it
-      if (
-        lastStatement &&
-        !lastStatement.match(/^\s*(let|const|var|function|class|if|for|while|return|{)\s/)
-      ) {
-        const precedingStatements = statements.slice(0, -1).join(";\n");
-        const codeToRun = precedingStatements
-          ? `${precedingStatements};\n return ${lastStatement};`
-          : `return ${lastStatement};`;
-        result = await vm.runInContext(`(async () => { ${codeToRun} })()`, this.vmContext, {
-          timeout: 30000,
-        });
-      } else {
-        // Run as statements only
-        result = await vm.runInContext(`(async () => { ${code} })()`, this.vmContext, {
-          timeout: 30000,
-        });
       }
-    }
+    );
+    // Clean up
+    delete this.vmContext.__evalArg;
 
     // Auto-await if result is a promise
     if (result && typeof result === "object" && result !== null && "then" in result) {
@@ -89,8 +64,8 @@ export class EvalRuntime {
 
   private async initializeContext(): Promise<void> {
     // Create proxies for all connected servers
-    const proxies = await createServerProxies(this.clientManager);
-    const context = createGlobalContext(proxies);
+    const proxies = await createServerProxies(this.upstreamServerManager);
+    const context = createGlobalContext(proxies, this.upstreamServerManager);
 
     // Create VM context with initial setup
     const vmContextData = {

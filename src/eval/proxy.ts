@@ -1,5 +1,5 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
-import type { ClientManager } from "../mcp/client-manager.js";
+import type { UpstreamServerManager } from "../mcp/upstream-server-manager.js";
 
 export interface ToolProxy {
   [toolName: string]: (args?: unknown) => Promise<unknown>;
@@ -19,12 +19,14 @@ export interface ServerProxies {
   [serverName: string]: ToolProxy;
 }
 
-export async function createServerProxies(clientManager: ClientManager): Promise<ServerProxies> {
+export async function createServerProxies(
+  upstreamServerManager: UpstreamServerManager
+): Promise<ServerProxies> {
   const proxies: ServerProxies = {};
-  const toolMap = await clientManager.getAllTools();
+  const toolMap = await upstreamServerManager.getAllTools();
 
   for (const [serverName, tools] of toolMap) {
-    proxies[serverName] = createToolProxy(serverName, tools, clientManager);
+    proxies[serverName] = createToolProxy(serverName, tools, upstreamServerManager);
   }
 
   return proxies;
@@ -33,15 +35,15 @@ export async function createServerProxies(clientManager: ClientManager): Promise
 function createToolProxy(
   serverName: string,
   tools: Tool[],
-  clientManager: ClientManager
+  upstreamServerManager: UpstreamServerManager
 ): ToolProxy {
-  const proxy: ToolProxy = {};
+  const toolFunctions: ToolProxy = {};
 
   for (const tool of tools) {
     // Create function that returns a custom promise with helper methods
-    proxy[tool.name] = (args?: unknown) => {
+    toolFunctions[tool.name] = (args?: unknown) => {
       const basePromise = (async () => {
-        const result = await clientManager.callTool(serverName, tool.name, args);
+        const result = await upstreamServerManager.callTool(serverName, tool.name, args);
 
         // Add helper methods to the result array
         if (Array.isArray(result)) {
@@ -81,10 +83,24 @@ function createToolProxy(
     };
   }
 
-  return proxy;
+  // Create a proxy that intercepts property access and provides helpful error messages
+  return new Proxy(toolFunctions, {
+    get(target, prop, receiver) {
+      if (typeof prop === "string" && !(prop in target)) {
+        const availableTools = Object.keys(target);
+        throw new Error(
+          `Tool '${prop}' not found in server '${serverName}'. Available tools: ${availableTools.join(", ")}`
+        );
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
 }
 
-export function createGlobalContext(proxies: ServerProxies): Record<string, unknown> {
+export function createGlobalContext(
+  proxies: ServerProxies,
+  upstreamServerManager: UpstreamServerManager
+): Record<string, unknown> {
   // Create the global context that will be available in eval'd code
   const context: Record<string, unknown> = {};
 
@@ -107,6 +123,55 @@ export function createGlobalContext(proxies: ServerProxies): Record<string, unkn
       allTools[name] = Object.keys(proxy);
     }
     return allTools;
+  };
+
+  context.help = async (serverName: string, toolName?: string) => {
+    // Get client for the server
+    const client = upstreamServerManager.getClient(serverName);
+    if (!client) {
+      throw new Error(
+        `Server '${serverName}' not found. Available servers: ${Object.keys(proxies).join(", ")}`
+      );
+    }
+
+    try {
+      // Get all tools for the server
+      const result = await client.listTools();
+      const tools = result.tools || [];
+
+      if (toolName) {
+        // Show help for specific tool
+        const tool = tools.find((t) => t.name === toolName);
+        if (!tool) {
+          throw new Error(
+            `Tool '${toolName}' not found in server '${serverName}'. Available tools: ${tools.map((t) => t.name).join(", ")}`
+          );
+        }
+
+        return {
+          server: serverName,
+          tool: {
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema || {},
+          },
+        };
+      } else {
+        // Show help for all tools in server
+        return {
+          server: serverName,
+          tools: tools.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            inputSchema: tool.inputSchema || {},
+          })),
+        };
+      }
+    } catch (error) {
+      throw new Error(
+        `Error getting tools from server '${serverName}': ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
   };
 
   return context;

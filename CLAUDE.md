@@ -48,7 +48,7 @@ bun cli validate
 bun cli test
 bun cli serve
 bun cli auth
-bun cli eval "code" [--roots /path/to/dir]
+bun cli eval "function-expression" [--arg '{"key": "value"}'] [--roots /path/to/dir]
 
 # Linting and formatting
 bun run lint
@@ -104,4 +104,12 @@ MCPMan acts as a transparent proxy for MCP roots:
 
 ## Tool Usage
 
-When developing, remember that MCPMan's primary function is exposing an `eval` tool that provides access to all connected MCP servers through JavaScript execution.
+When developing, remember that MCPMan's primary function is exposing an `eval` tool that executes function expressions with access to all connected MCP servers. The eval tool requires:
+
+- **code**: A function expression (e.g., `(arg) => arg.value * 2` or `() => filesystem.listFiles({path: '.'})`)
+- **arg**: Optional JSON object passed as parameter to the function
+
+Examples:
+- `eval` tool with no argument: `() => listServers()`
+- `eval` tool with argument: `(arg) => filesystem.listFiles({path: arg.directory})`
+- Always run tests with bun run test, not bun test

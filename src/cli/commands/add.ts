@@ -12,10 +12,10 @@ import type { HttpServerConfig, ServerConfig, Settings } from "../../config/sche
 
 const transportType = {
   from: async (str: string) => {
-    if (str !== "stdio" && str !== "http") {
-      throw new Error("Transport must be 'stdio' or 'http'");
+    if (str !== "stdio" && str !== "http" && str !== "auto") {
+      throw new Error("Transport must be 'stdio', 'http', or 'auto'");
     }
-    return str as "stdio" | "http";
+    return str as "stdio" | "http" | "auto";
   },
 };
 
@@ -38,7 +38,7 @@ export const addCommand = command({
       long: "transport",
       type: transportType,
       description: "Transport type (auto-detected if not specified)",
-      defaultValue: () => "auto" as "stdio" | "http",
+      defaultValue: () => "auto" as "stdio" | "http" | "auto",
     }),
     env: option({
       short: "e",
@@ -88,7 +88,7 @@ export const addCommand = command({
 
       // Auto-detect transport if not specified
       let transport = args.transport;
-      if (!transport) {
+      if (transport === "auto") {
         // Auto-detect based on URL pattern
         if (args.urlOrCommand.startsWith("http://") || args.urlOrCommand.startsWith("https://")) {
           transport = "http";

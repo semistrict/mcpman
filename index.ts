@@ -45,7 +45,7 @@ async function main() {
   const { loadConfig } = await import("./src/config/loader.js");
   const { UpstreamServerManager } = await import("./src/mcp/upstream-server-manager.js");
   const { EvalRuntime } = await import("./src/eval/runtime.js");
-  const { createMcpServer, connectMcpServer, disconnectMcpServer, getMcpServer } = await import(
+  const { createMcpServer, disconnectMcpServer, getMcpServer } = await import(
     "./src/mcp/server.js"
   );
 
@@ -65,7 +65,7 @@ async function main() {
 
     // Create MCP server with dependencies
     console.log("Creating MCP server...");
-    createMcpServer(evalRuntime, upstreamServerManager);
+    await createMcpServer(evalRuntime, upstreamServerManager);
     console.log("Starting MCP server...");
 
     // Handle graceful shutdown
@@ -82,10 +82,6 @@ async function main() {
       await upstreamServerManager.disconnect();
       process.exit(0);
     });
-
-    // Start the MCP server first so client can connect via stdio
-    await connectMcpServer();
-    console.log("MCP server is listening and ready");
 
     // Set up roots provider now that MCP server is ready
     upstreamServerManager.setRootsProvider(async () => {

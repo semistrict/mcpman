@@ -2,6 +2,7 @@ import { command, positional, string, option } from "cmd-ts";
 import { loadConfig } from "../../config/loader.js";
 import { EvalRuntime } from "../../eval/runtime.js";
 import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
+import { formatEvalResult } from "../../utils/call-tool-result.js";
 
 export const evalCommand = command({
   name: "eval",
@@ -61,19 +62,17 @@ export const evalCommand = command({
       const evalRuntime = new EvalRuntime(upstreamServerManager);
 
       // Execute the function expression with the argument
-      const { result, output } = await evalRuntime.eval(args.code, argValue);
+      const evalResult = await evalRuntime.eval(args.code, argValue);
 
-      // Output console logs/errors first
-      if (output) {
-        console.log(output);
-      }
+      // Format the result using the same logic as the MCP server
+      const formattedResult = formatEvalResult(evalResult);
 
-      // Output the result
-      if (result !== undefined) {
-        if (typeof result === "string") {
-          console.log(result);
+      // Output the formatted result
+      for (const content of formattedResult.content) {
+        if (content.type === "text") {
+          console.log(content.text);
         } else {
-          console.log(JSON.stringify(result, null, 2));
+          console.log(JSON.stringify(content, null, 2));
         }
       }
 

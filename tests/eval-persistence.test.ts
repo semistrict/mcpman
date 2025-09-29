@@ -126,9 +126,9 @@ describe('Eval Persistence Integration Test', () => {
       },
     });
 
+    // With CallToolResult parsing, object results are wrapped in content array
     const content2 = result2.content as Array<{type: string, text: string}>;
-    const resultText = content2[0]?.text || '';
-    const dataStr = resultText.replace('Result: ', '');
+    const dataStr = content2[0]?.text.replace('Result: ', '') || '';
     const data = JSON.parse(dataStr);
     expect(data.count).toBe(1);
     expect(data.items).toEqual(['hello']);

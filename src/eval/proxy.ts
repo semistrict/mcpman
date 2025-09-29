@@ -83,13 +83,40 @@ function createToolProxy(
     };
   }
 
-  // Create a proxy that intercepts property access and provides helpful error messages
+  // Create a proxy that intercepts property access and supports name conversion
   return new Proxy(toolFunctions, {
     get(target, prop, receiver) {
-      if (typeof prop === "string" && !(prop in target)) {
+      if (typeof prop === "string") {
+        // First try the exact property name
+        if (prop in target) {
+          return Reflect.get(target, prop, receiver);
+        }
+
+        // Try converting underscores to dashes and spaces to find a match
+        const dashVersion = prop.replace(/_/g, "-");
+        const spaceVersion = prop.replace(/_/g, " ");
+
+        // Look for a tool that matches when converted to underscore format
+        for (const toolName of Object.keys(target)) {
+          const underscoreVersion = toolName.replace(/[-\s]/g, "_");
+          if (underscoreVersion === prop) {
+            return target[toolName];
+          }
+        }
+
+        // Also try direct dash and space versions
+        if (dashVersion in target) {
+          return target[dashVersion];
+        }
+        if (spaceVersion in target) {
+          return target[spaceVersion];
+        }
+
+        // Tool not found, provide helpful error message
         const availableTools = Object.keys(target);
+        const underscoreVersions = availableTools.map((name) => name.replace(/[-\s]/g, "_"));
         throw new Error(
-          `Tool '${prop}' not found in server '${serverName}'. Available tools: ${availableTools.join(", ")}`
+          `Tool '${prop}' not found in server '${serverName}'. Available tools: ${availableTools.join(", ")} (can also use underscore versions: ${underscoreVersions.join(", ")})`
         );
       }
       return Reflect.get(target, prop, receiver);

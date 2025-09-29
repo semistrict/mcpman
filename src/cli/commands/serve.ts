@@ -2,12 +2,7 @@ import { command } from "cmd-ts";
 import { loadConfig } from "../../config/loader.js";
 import { EvalRuntime } from "../../eval/runtime.js";
 import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
-import {
-  createMcpServer,
-  connectMcpServer,
-  disconnectMcpServer,
-  getMcpServer,
-} from "../../mcp/server.js";
+import { createMcpServer, disconnectMcpServer, getMcpServer } from "../../mcp/server.js";
 
 export const serveCommand = command({
   name: "serve",
@@ -25,7 +20,7 @@ export const serveCommand = command({
       const evalRuntime = new EvalRuntime(upstreamServerManager);
 
       // Create MCP server
-      createMcpServer(evalRuntime, upstreamServerManager);
+      await createMcpServer(evalRuntime, upstreamServerManager);
 
       // Handle graceful shutdown
       const shutdown = async () => {
@@ -38,9 +33,8 @@ export const serveCommand = command({
       process.on("SIGINT", shutdown);
       process.on("SIGTERM", shutdown);
 
-      // Start the server
+      // Server is already started by createMcpServer
       console.error("MCPMan server starting...");
-      await connectMcpServer();
 
       // Set up roots provider now that MCP server is ready
       upstreamServerManager.setRootsProvider(async () => {

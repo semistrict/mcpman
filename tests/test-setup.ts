@@ -36,5 +36,28 @@ export async function createTestClient(name: string): Promise<{ client: Client; 
 
   await client.connect(transport);
 
+  // Wait for tools to be registered (poll until eval tool is available)
+  await waitForToolRegistration(client);
+
   return { client, transport };
+}
+
+async function waitForToolRegistration(client: Client, maxRetries = 50, delayMs = 100): Promise<void> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      const result = await client.listTools();
+      const evalTool = result.tools?.find(tool => tool.name === 'eval');
+      if (evalTool) {
+        // Real tools are available, registration is complete
+        return;
+      }
+    } catch (error) {
+      // Ignore errors and keep retrying
+    }
+
+    // Wait before retrying
+    await new Promise(resolve => setTimeout(resolve, delayMs));
+  }
+
+  throw new Error('Timeout waiting for tool registration to complete');
 }

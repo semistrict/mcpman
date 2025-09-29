@@ -198,12 +198,18 @@ export class UpstreamServerManager {
       throw new Error(`Server ${serverName} not connected`);
     }
 
+    console.log(`Calling tool ${serverName}.${toolName} with args:`, JSON.stringify(args, null, 2));
+
     try {
       const result = await client.callTool({
         name: toolName,
         arguments: (args as Record<string, unknown>) || {},
       });
 
+      console.log(
+        `Tool call ${serverName}.${toolName} result:`,
+        JSON.stringify(result.content, null, 2)
+      );
       return result.content;
     } catch (error) {
       console.error(`Tool call failed for ${serverName}.${toolName}:`, error);
@@ -217,6 +223,12 @@ export class UpstreamServerManager {
 
   getConnectedServers(): string[] {
     return Array.from(this.clients.keys());
+  }
+
+  getConfiguredServers(): string[] {
+    return Object.keys(this.settings.servers).filter(
+      (name) => !this.settings.servers[name]?.disabled
+    );
   }
 
   // Notify all connected servers that roots have changed

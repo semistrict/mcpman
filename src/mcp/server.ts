@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { EvalRuntime } from "../eval/runtime.js";
 import type { UpstreamServerManager } from "./upstream-server-manager.js";
 import { TRACE } from "../utils/logging.js";
+import { formatEvalResult } from "../utils/call-tool-result.js";
 
 interface ServerInfo {
   connected: boolean;
@@ -30,7 +31,7 @@ const initializedMcpServer: Promise<McpServer> = new Promise<McpServer>((resolve
 export function createMcpServer(
   evalRuntime: EvalRuntime,
   upstreamServerManager: UpstreamServerManager
-): McpServer {
+): Promise<McpServer> {
   TRACE("Creating MCP server with oninitialized callback");
 
   // Set the oninitialized callback on the underlying server
@@ -50,12 +51,32 @@ export function createMcpServer(
     }
   };
 
+  // Register tools immediately with static descriptions
+  registerTools(mcpServer, evalRuntime, upstreamServerManager);
+
+  connectMcpServer();
+
+  TRACE("Server created and tools registered, ready for connections");
+  return initializedMcpServer;
+}
+
+function registerTools(
+  mcpServer: McpServer,
+  evalRuntime: EvalRuntime,
+  upstreamServerManager: UpstreamServerManager
+) {
+  TRACE("Registering MCP server tools...");
+
+  // Generate static description with configured server names
+  const staticDescription = generateStaticEvalDescription(upstreamServerManager);
+
   // Register eval tool
+  TRACE("Registering eval tool");
   mcpServer.registerTool(
     "eval",
     {
       title: "JavaScript Evaluator",
-      description: "Execute an IIFE with access to MCP tools and a parameter object",
+      description: staticDescription,
       inputSchema: {
         code: z
           .string()
@@ -66,26 +87,15 @@ export function createMcpServer(
       },
     },
     async ({ code, arg }) => {
-      await initializedMcpServer; // Ensure initialization is complete
+      await initializedMcpServer; // Wait for upstream servers to be connected
       const result = await evalRuntime.eval(code, arg);
-
-      const serializedResult =
-        typeof result.result === "object" && result.result !== null
-          ? JSON.stringify(result.result)
-          : String(result.result);
-
-      return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Result: ${serializedResult}${result.output ? `\nOutput:\n${result.output}` : ""}`,
-          },
-        ],
-      };
+      return formatEvalResult(result);
     }
   );
+  TRACE("Eval tool registered");
 
   // Register list_servers tool
+  TRACE("Registering list_servers tool");
   mcpServer.registerTool(
     "list_servers",
     {
@@ -94,12 +104,14 @@ export function createMcpServer(
       inputSchema: {},
     },
     async () => {
-      await initializedMcpServer; // Ensure initialization is complete
+      await initializedMcpServer; // Wait for upstream servers to be connected
       return await handleListServers(upstreamServerManager);
     }
   );
+  TRACE("List_servers tool registered");
 
   // Register help tool
+  TRACE("Registering help tool");
   mcpServer.registerTool(
     "help",
     {
@@ -111,16 +123,37 @@ export function createMcpServer(
       },
     },
     async ({ server, tool }) => {
-      await initializedMcpServer; // Ensure initialization is complete
+      await initializedMcpServer; // Wait for upstream servers to be connected
       return await handleHelp(upstreamServerManager, server, tool);
     }
   );
-
-  return mcpServer;
+  TRACE("Help tool registered");
+  TRACE("All tools registered successfully");
 }
 
 export function getMcpServer(): Promise<McpServer> {
   return initializedMcpServer;
+}
+
+function generateStaticEvalDescription(upstreamServerManager: UpstreamServerManager): string {
+  const configuredServers = upstreamServerManager.getConfiguredServers();
+
+  let description =
+    "Execute a JavaScript function expression with access to MCP tools and a parameter object.\n\n";
+
+  if (configuredServers.length === 0) {
+    description += "No MCP servers configured.";
+  } else {
+    description += "Configured MCP servers:\n\n";
+    for (const serverName of configuredServers) {
+      description += `• ${serverName}\n`;
+    }
+    description +=
+      "\nUse serverName.toolName(args) to call tools (e.g., filesystem.list_directory({path: '.'}))\n";
+    description += "Use help('serverName') to list available tools for each server.";
+  }
+
+  return description;
 }
 
 async function handleListServers(upstreamServerManager: UpstreamServerManager) {
@@ -233,7 +266,7 @@ async function handleHelp(
   }
 }
 
-export async function connectMcpServer(): Promise<void> {
+async function connectMcpServer(): Promise<void> {
   TRACE("Connecting MCP server to stdio transport");
   const transport = new StdioServerTransport();
   await mcpServer.connect(transport);

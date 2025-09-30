@@ -30,7 +30,8 @@ const initializedMcpServer: Promise<McpServer> = new Promise<McpServer>((resolve
 
 export function createMcpServer(
   evalRuntime: EvalRuntime,
-  upstreamServerManager: UpstreamServerManager
+  upstreamServerManager: UpstreamServerManager,
+  serverPort?: number
 ): Promise<McpServer> {
   TRACE("Creating MCP server with oninitialized callback");
 
@@ -52,7 +53,7 @@ export function createMcpServer(
   };
 
   // Register tools immediately with static descriptions
-  registerTools(mcpServer, evalRuntime, upstreamServerManager);
+  registerTools(mcpServer, evalRuntime, upstreamServerManager, serverPort);
 
   connectMcpServer();
 
@@ -63,7 +64,8 @@ export function createMcpServer(
 function registerTools(
   mcpServer: McpServer,
   evalRuntime: EvalRuntime,
-  upstreamServerManager: UpstreamServerManager
+  upstreamServerManager: UpstreamServerManager,
+  serverPort?: number
 ) {
   TRACE("Registering MCP server tools...");
 
@@ -128,6 +130,42 @@ function registerTools(
     }
   );
   TRACE("Help tool registered");
+
+  // Register invoke tool
+  TRACE("Registering invoke tool");
+  mcpServer.registerTool(
+    "invoke",
+    {
+      title: "Invoke Tool",
+      description:
+        "Directly invoke a tool from an underlying MCP server with schema validation. The parameters will be validated against the tool's input schema before invocation.",
+      inputSchema: {
+        server: z.string().describe("Name of the MCP server"),
+        tool: z.string().describe("Name of the tool to invoke"),
+        parameters: z.unknown().optional().describe("Parameters to pass to the tool"),
+      },
+    },
+    async ({ server, tool, parameters }) => {
+      await initializedMcpServer; // Wait for upstream servers to be connected
+      return await handleInvoke(upstreamServerManager, server, tool, parameters);
+    }
+  );
+  TRACE("Invoke tool registered");
+
+  // Register open_ui tool
+  TRACE("Registering open_ui tool");
+  mcpServer.registerTool(
+    "open_ui",
+    {
+      title: "Open UI",
+      description: "Open the MCPMan web UI in the system browser",
+      inputSchema: {},
+    },
+    async () => {
+      return await handleOpenUI(serverPort);
+    }
+  );
+  TRACE("Open_ui tool registered");
   TRACE("All tools registered successfully");
 }
 
@@ -260,6 +298,210 @@ async function handleHelp(
         {
           type: "text" as const,
           text: `Error getting tools from server '${serverName}': ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+    };
+  }
+}
+
+async function handleInvoke(
+  upstreamServerManager: UpstreamServerManager,
+  serverName: string,
+  toolName: string,
+  parameters?: unknown
+) {
+  const client = upstreamServerManager.getClient(serverName);
+  if (!client) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Error: Server '${serverName}' not found. Available servers: ${upstreamServerManager.getConnectedServers().join(", ")}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+
+  try {
+    // Get the tool schema from the server
+    const result = await client.listTools();
+    const tools = result.tools || [];
+    const tool = tools.find((t) => t.name === toolName);
+
+    if (!tool) {
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `Error: Tool '${toolName}' not found in server '${serverName}'. Available tools: ${tools.map((t) => t.name).join(", ")}`,
+          },
+        ],
+        isError: true,
+      };
+    }
+
+    // Validate parameters against the tool's input schema using Zod
+    if (tool.inputSchema) {
+      try {
+        // Convert JSON Schema to Zod schema and validate
+        const zodSchema = jsonSchemaToZod(tool.inputSchema);
+        const validatedParams = zodSchema.parse(parameters || {});
+
+        // Call the tool with validated parameters
+        const toolResult = await upstreamServerManager.callTool(
+          serverName,
+          toolName,
+          validatedParams
+        );
+
+        return {
+          content: Array.isArray(toolResult)
+            ? toolResult
+            : [
+                {
+                  type: "text" as const,
+                  text: JSON.stringify(toolResult, null, 2),
+                },
+              ],
+        };
+      } catch (error) {
+        if (error instanceof z.ZodError) {
+          return {
+            content: [
+              {
+                type: "text" as const,
+                text: `Parameter validation error: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+              },
+            ],
+            isError: true,
+          };
+        }
+        throw error;
+      }
+    } else {
+      // No schema to validate against, call directly
+      const toolResult = await upstreamServerManager.callTool(serverName, toolName, parameters);
+
+      return {
+        content: Array.isArray(toolResult)
+          ? toolResult
+          : [
+              {
+                type: "text" as const,
+                text: JSON.stringify(toolResult, null, 2),
+              },
+            ],
+      };
+    }
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Error invoking tool '${toolName}' on server '${serverName}': ${error instanceof Error ? error.message : String(error)}`,
+        },
+      ],
+      isError: true,
+    };
+  }
+}
+
+// Convert JSON Schema to Zod schema for validation
+function jsonSchemaToZod(schema: unknown): z.ZodType {
+  const jsonSchema = schema as {
+    type?: string;
+    properties?: Record<string, unknown>;
+    required?: string[];
+    additionalProperties?: boolean;
+  };
+
+  if (!jsonSchema || typeof jsonSchema !== "object") {
+    return z.unknown();
+  }
+
+  if (jsonSchema.type === "object" && jsonSchema.properties) {
+    const shape: Record<string, z.ZodType> = {};
+    const required = new Set(jsonSchema.required || []);
+
+    for (const [key, value] of Object.entries(jsonSchema.properties)) {
+      let fieldSchema = jsonSchemaToZod(value);
+      if (!required.has(key)) {
+        fieldSchema = fieldSchema.optional();
+      }
+      shape[key] = fieldSchema;
+    }
+
+    return z.object(shape);
+  }
+
+  if (jsonSchema.type === "array") {
+    return z.array(z.unknown());
+  }
+
+  if (jsonSchema.type === "string") {
+    return z.string();
+  }
+
+  if (jsonSchema.type === "number") {
+    return z.number();
+  }
+
+  if (jsonSchema.type === "integer") {
+    return z.number().int();
+  }
+
+  if (jsonSchema.type === "boolean") {
+    return z.boolean();
+  }
+
+  if (jsonSchema.type === "null") {
+    return z.null();
+  }
+
+  return z.unknown();
+}
+
+async function handleOpenUI(serverPort?: number) {
+  const port = serverPort || process.env.MCPMAN_UI_PORT || 8726;
+  const url = `http://localhost:${port}`;
+
+  try {
+    // Use system's default browser to open the URL
+    const { spawn } = await import("node:child_process");
+    const platform = process.platform;
+
+    let command: string;
+    let args: string[];
+
+    if (platform === "darwin") {
+      command = "open";
+      args = [url];
+    } else if (platform === "win32") {
+      command = "start";
+      args = ["", url];
+    } else {
+      // Linux and other Unix-like systems
+      command = "xdg-open";
+      args = [url];
+    }
+
+    spawn(command, args, { detached: true, stdio: "ignore" });
+
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Opened MCPMan UI in browser: ${url}`,
+        },
+      ],
+    };
+  } catch (error) {
+    return {
+      content: [
+        {
+          type: "text" as const,
+          text: `Failed to open browser: ${error instanceof Error ? error.message : String(error)}. Please manually open: ${url}`,
         },
       ],
     };

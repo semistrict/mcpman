@@ -85,7 +85,11 @@ function registerTools(
           .describe(
             "Function expression that optionally accepts a single parameter. Use serverName.toolName(args) to call tools."
           ),
-        arg: z.unknown().optional().describe("Object to pass as parameter to the function"),
+        arg: z
+          .object({})
+          .passthrough()
+          .optional()
+          .describe("Object to pass as parameter to the function"),
       },
     },
     async ({ code, arg }) => {
@@ -136,18 +140,32 @@ function registerTools(
   mcpServer.registerTool(
     "invoke",
     {
-      title: "Invoke Tool",
+      title: "Invoke Tools",
       description:
-        "Directly invoke a tool from an underlying MCP server with schema validation. The parameters will be validated against the tool's input schema before invocation.",
+        "Invoke multiple tools from underlying MCP servers with schema validation. Pass an array of tool calls to invoke them together rather than making separate tool calls one after another. In parallel mode (parallel: true), all tools are invoked concurrently and all results/errors are returned. In sequential mode (parallel: false, default), tools are invoked one at a time in order, stopping and returning results so far if any tool fails.",
       inputSchema: {
-        server: z.string().describe("Name of the MCP server"),
-        tool: z.string().describe("Name of the tool to invoke"),
-        parameters: z.unknown().optional().describe("Parameters to pass to the tool"),
+        calls: z
+          .array(
+            z.object({
+              server: z.string().describe("Name of the MCP server"),
+              tool: z.string().describe("Name of the tool to invoke"),
+              parameters: z
+                .object({})
+                .passthrough()
+                .optional()
+                .describe("Parameters to pass to the tool"),
+            })
+          )
+          .describe("Array of tool calls to invoke"),
+        parallel: z
+          .boolean()
+          .default(false)
+          .describe("Whether to invoke tools in parallel or sequentially"),
       },
     },
-    async ({ server, tool, parameters }) => {
+    async ({ calls, parallel }) => {
       await initializedMcpServer; // Wait for upstream servers to be connected
-      return await handleInvoke(upstreamServerManager, server, tool, parameters);
+      return await handleInvoke(upstreamServerManager, calls, parallel);
     }
   );
   TRACE("Invoke tool registered");
@@ -306,105 +324,134 @@ async function handleHelp(
 
 async function handleInvoke(
   upstreamServerManager: UpstreamServerManager,
-  serverName: string,
-  toolName: string,
-  parameters?: unknown
+  calls: Array<{ server: string; tool: string; parameters?: unknown }>,
+  parallel: boolean
 ) {
-  const client = upstreamServerManager.getClient(serverName);
-  if (!client) {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Error: Server '${serverName}' not found. Available servers: ${upstreamServerManager.getConnectedServers().join(", ")}`,
-        },
-      ],
-      isError: true,
-    };
-  }
+  const invokeSingle = async (
+    call: { server: string; tool: string; parameters?: unknown },
+    index: number
+  ): Promise<{ success: boolean; result: { type: "text"; text: string } }> => {
+    const { server: serverName, tool: toolName, parameters } = call;
+    const heading = `\n## [${index}] ${serverName}.${toolName}\n`;
 
-  try {
-    // Get the tool schema from the server
-    const result = await client.listTools();
-    const tools = result.tools || [];
-    const tool = tools.find((t) => t.name === toolName);
-
-    if (!tool) {
+    const client = upstreamServerManager.getClient(serverName);
+    if (!client) {
       return {
-        content: [
-          {
-            type: "text" as const,
-            text: `Error: Tool '${toolName}' not found in server '${serverName}'. Available tools: ${tools.map((t) => t.name).join(", ")}`,
-          },
-        ],
-        isError: true,
+        success: false,
+        result: {
+          type: "text" as const,
+          text: `${heading}Error: Server '${serverName}' not found. Available servers: ${upstreamServerManager.getConnectedServers().join(", ")}`,
+        },
       };
     }
 
-    // Validate parameters against the tool's input schema using Zod
-    if (tool.inputSchema) {
-      try {
-        // Convert JSON Schema to Zod schema and validate
-        const zodSchema = jsonSchemaToZod(tool.inputSchema);
-        const validatedParams = zodSchema.parse(parameters || {});
+    try {
+      // Get the tool schema from the server
+      const result = await client.listTools();
+      const tools = result.tools || [];
+      const tool = tools.find((t) => t.name === toolName);
 
-        // Call the tool with validated parameters
-        const toolResult = await upstreamServerManager.callTool(
-          serverName,
-          toolName,
-          validatedParams
-        );
+      if (!tool) {
+        return {
+          success: false,
+          result: {
+            type: "text" as const,
+            text: `${heading}Error: Tool '${toolName}' not found in server '${serverName}'. Available tools: ${tools.map((t) => t.name).join(", ")}`,
+          },
+        };
+      }
+
+      // Validate parameters against the tool's input schema using Zod
+      if (tool.inputSchema) {
+        try {
+          // Convert JSON Schema to Zod schema and validate
+          const zodSchema = jsonSchemaToZod(tool.inputSchema);
+          const validatedParams = zodSchema.parse(parameters || {});
+
+          // Call the tool with validated parameters
+          const toolResult = await upstreamServerManager.callTool(
+            serverName,
+            toolName,
+            validatedParams
+          );
+
+          const resultText = Array.isArray(toolResult)
+            ? toolResult
+                .map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
+                .join("\n")
+            : JSON.stringify(toolResult, null, 2);
+
+          return {
+            success: true,
+            result: {
+              type: "text" as const,
+              text: `${heading}${resultText}`,
+            },
+          };
+        } catch (error) {
+          if (error instanceof z.ZodError) {
+            return {
+              success: false,
+              result: {
+                type: "text" as const,
+                text: `${heading}Parameter validation error: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+              },
+            };
+          }
+          throw error;
+        }
+      } else {
+        // No schema to validate against, call directly
+        const toolResult = await upstreamServerManager.callTool(serverName, toolName, parameters);
+
+        const resultText = Array.isArray(toolResult)
+          ? toolResult
+              .map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
+              .join("\n")
+          : JSON.stringify(toolResult, null, 2);
 
         return {
-          content: Array.isArray(toolResult)
-            ? toolResult
-            : [
-                {
-                  type: "text" as const,
-                  text: JSON.stringify(toolResult, null, 2),
-                },
-              ],
+          success: true,
+          result: {
+            type: "text" as const,
+            text: `${heading}${resultText}`,
+          },
         };
-      } catch (error) {
-        if (error instanceof z.ZodError) {
-          return {
-            content: [
-              {
-                type: "text" as const,
-                text: `Parameter validation error: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
-              },
-            ],
-            isError: true,
-          };
-        }
-        throw error;
       }
-    } else {
-      // No schema to validate against, call directly
-      const toolResult = await upstreamServerManager.callTool(serverName, toolName, parameters);
-
+    } catch (error) {
       return {
-        content: Array.isArray(toolResult)
-          ? toolResult
-          : [
-              {
-                type: "text" as const,
-                text: JSON.stringify(toolResult, null, 2),
-              },
-            ],
+        success: false,
+        result: {
+          type: "text" as const,
+          text: `${heading}Error invoking tool '${toolName}' on server '${serverName}': ${error instanceof Error ? error.message : String(error)}`,
+        },
       };
     }
-  } catch (error) {
-    return {
-      content: [
-        {
-          type: "text" as const,
-          text: `Error invoking tool '${toolName}' on server '${serverName}': ${error instanceof Error ? error.message : String(error)}`,
-        },
-      ],
-      isError: true,
-    };
+  };
+
+  let results: Array<{ type: "text"; text: string }>;
+
+  if (parallel) {
+    // Invoke all calls in parallel, all results and errors are returned
+    const allResults = await Promise.all(calls.map((call, index) => invokeSingle(call, index)));
+    results = allResults.map((r) => r.result);
+  } else {
+    // Invoke calls sequentially, stop on first error
+    results = [];
+    for (let i = 0; i < calls.length; i++) {
+      const call = calls[i];
+      if (!call) continue;
+      const { success, result } = await invokeSingle(call, i);
+      results.push(result);
+      if (!success) {
+        break;
+      }
+    }
   }
+
+  return {
+    content: results,
+  };
 }
 
 // Convert JSON Schema to Zod schema for validation

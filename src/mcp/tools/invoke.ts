@@ -1,14 +1,12 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { EvalRuntime } from "../../eval/runtime.js";
 import { TRACE } from "../../utils/logging.js";
-import type { UpstreamServerManager } from "../upstream-server-manager.js";
+import type { ToolManager } from "../tool-manager.js";
 import { formatResultOutput } from "./eval.js";
 
 export function registerInvokeTool(
   mcpServer: McpServer,
-  upstreamServerManager: UpstreamServerManager,
-  evalRuntime: EvalRuntime,
+  toolManager: ToolManager,
   initializedMcpServer: Promise<McpServer>
 ) {
   TRACE("Registering invoke tool");
@@ -17,7 +15,7 @@ export function registerInvokeTool(
     {
       title: "Invoke Tools",
       description:
-        "Invoke multiple tools from underlying MCP servers with schema validation. Pass an array of tool calls to invoke them together rather than making separate tool calls one after another. In parallel mode (parallel: true), all tools are invoked concurrently and all results/errors are returned. In sequential mode (parallel: false, default), tools are invoked one at a time in order, stopping and returning results so far if any tool fails.",
+        "Invoke multiple tools from underlying MCP servers with schema validation. Pass an array of tool calls to invoke them together rather than making separate tool calls one after another. In parallel mode (parallel: true), all tools are invoked concurrently and all results/errors are returned. In sequential mode (parallel: false, default), tools are invoked one at a time in order, stopping and returning results so far if any tool fails.\n\nIMPORTANT: DO NOT use this tool to invoke MCPMan's own tools (code, eval, invoke, list_servers, help, install). Call those tools directly instead. This tool is only for invoking tools from upstream MCP servers.",
       inputSchema: {
         calls: z
           .array(
@@ -40,7 +38,7 @@ export function registerInvokeTool(
     },
     async ({ calls, parallel }) => {
       await initializedMcpServer; // Wait for upstream servers to be connected
-      return await handleInvoke(upstreamServerManager, evalRuntime, calls, parallel);
+      return await handleInvoke(toolManager, calls, parallel);
     }
   );
   TRACE("Invoke tool registered");
@@ -65,8 +63,7 @@ function unwrapToolResult(toolResult: unknown): unknown {
 }
 
 async function handleInvoke(
-  upstreamServerManager: UpstreamServerManager,
-  evalRuntime: EvalRuntime,
+  toolManager: ToolManager,
   calls: Array<{ server: string; tool: string; parameters?: unknown }>,
   parallel: boolean
 ) {
@@ -81,13 +78,13 @@ async function handleInvoke(
   }> => {
     const { server: serverName, tool: toolName, parameters } = call;
 
-    const client = upstreamServerManager.getClient(serverName);
+    const client = toolManager.getClient(serverName);
     if (!client) {
       return {
         success: false,
         result: {
           type: "text" as const,
-          text: `Error: Server '${serverName}' not found. Available servers: ${upstreamServerManager.getConnectedServers().join(", ")}`,
+          text: `Error: Server '${serverName}' not found. Available servers: ${toolManager.getConnectedServers().join(", ")}`,
         },
       };
     }
@@ -115,16 +112,12 @@ async function handleInvoke(
           const zodSchema = jsonSchemaToZod(tool.inputSchema);
           const validatedParams = zodSchema.parse(parameters || {});
 
-          // Call the tool with validated parameters
-          const toolResult = await upstreamServerManager.callTool(
-            serverName,
-            toolName,
-            validatedParams
-          );
+          // Call the tool with validated parameters using ToolManager
+          const toolResult = await toolManager.callTool(serverName, toolName, validatedParams);
 
-          // Unwrap and append to $results
+          // Unwrap and append to $results using ToolManager
           const unwrappedResult = unwrapToolResult(toolResult);
-          const resultsIndex = await evalRuntime.appendResult(unwrappedResult);
+          const resultsIndex = await toolManager.appendResult(unwrappedResult);
 
           // Format output with shared function
           const formattedOutput = formatResultOutput(
@@ -155,12 +148,12 @@ async function handleInvoke(
           throw error;
         }
       } else {
-        // No schema to validate against, call directly
-        const toolResult = await upstreamServerManager.callTool(serverName, toolName, parameters);
+        // No schema to validate against, call directly using ToolManager
+        const toolResult = await toolManager.callTool(serverName, toolName, parameters);
 
-        // Unwrap and append to $results
+        // Unwrap and append to $results using ToolManager
         const unwrappedResult = unwrapToolResult(toolResult);
-        const resultsIndex = await evalRuntime.appendResult(unwrappedResult);
+        const resultsIndex = await toolManager.appendResult(unwrappedResult);
 
         // Format output with shared function
         const formattedOutput = formatResultOutput(

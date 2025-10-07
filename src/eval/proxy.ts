@@ -1,6 +1,30 @@
 import type { Tool } from "@modelcontextprotocol/sdk/types.js";
 import type { UpstreamServerManager } from "../mcp/upstream-server-manager.js";
 
+/**
+ * Converts camelCase to the most likely original format with hyphens/underscores
+ * Example: listTargets -> list-targets or list_targets
+ */
+function camelCaseToPossibleOriginals(camelCaseStr: string): string[] {
+  // Convert camelCase to snake_case and kebab-case
+  const withSeparators = camelCaseStr.replace(/([A-Z])/g, "-$1").toLowerCase();
+  const dashVersion = withSeparators.startsWith("-") ? withSeparators.slice(1) : withSeparators;
+  const underscoreVersion = dashVersion.replace(/-/g, "_");
+  const spaceVersion = dashVersion.replace(/-/g, " ");
+
+  return [camelCaseStr, dashVersion, underscoreVersion, spaceVersion];
+}
+
+/**
+ * Converts dash-case or snake_case to camelCase
+ * Example: agent-debugger -> agentDebugger, list_targets -> listTargets
+ */
+function toCamelCase(str: string): string {
+  return str
+    .replace(/[-_]([a-z])/g, (_, letter) => letter.toUpperCase())
+    .replace(/^[a-z]/, (letter) => letter.toLowerCase());
+}
+
 export interface ToolProxy {
   [toolName: string]: (args?: unknown) => Promise<unknown>;
 }
@@ -92,6 +116,14 @@ function createToolProxy(
           return Reflect.get(target, prop, receiver);
         }
 
+        // Try camelCase variants (e.g., listTargets -> list-targets)
+        const possibleOriginals = camelCaseToPossibleOriginals(prop);
+        for (const possibleName of possibleOriginals) {
+          if (possibleName in target) {
+            return target[possibleName];
+          }
+        }
+
         // Try converting underscores to dashes and spaces to find a match
         const dashVersion = prop.replace(/_/g, "-");
         const spaceVersion = prop.replace(/_/g, " ");
@@ -131,9 +163,15 @@ export function createGlobalContext(
   // Create the global context that will be available in eval'd code
   const context: Record<string, unknown> = {};
 
-  // Add each server as a global variable
+  // Add each server as a global variable (with both original and camelCase names)
   for (const [serverName, toolProxy] of Object.entries(proxies)) {
     context[serverName] = toolProxy;
+
+    // Also add camelCase version (e.g., agent-debugger -> agentDebugger)
+    const camelCaseName = toCamelCase(serverName);
+    if (camelCaseName !== serverName) {
+      context[camelCaseName] = toolProxy;
+    }
   }
 
   // Add utility functions

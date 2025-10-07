@@ -13,6 +13,7 @@ async function main() {
     const { serveCommand } = await import("./src/cli/commands/serve.js");
     const { authCommand } = await import("./src/cli/commands/auth.js");
     const { evalCommand } = await import("./src/cli/commands/eval.js");
+    const { codeCommand } = await import("./src/cli/commands/code.js");
 
     // Create main CLI app
     const app = subcommands({
@@ -29,6 +30,7 @@ async function main() {
         serve: serveCommand,
         auth: authCommand,
         eval: evalCommand,
+        code: codeCommand,
       },
     });
 

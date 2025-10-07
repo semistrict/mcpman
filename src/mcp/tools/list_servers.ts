@@ -18,7 +18,8 @@ export function registerListServersTool(
     "list_servers",
     {
       title: "List MCP Servers",
-      description: "List all connected MCP servers and their tools",
+      description:
+        "List all connected upstream MCP servers and their tools. This does NOT list MCPMan's own tools (code, eval, invoke, list_servers, help, install) - those are always available and should be called directly.",
       inputSchema: {},
     },
     async () => {

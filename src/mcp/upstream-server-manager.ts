@@ -91,6 +91,13 @@ export class UpstreamServerManager {
     this.clients.set(name, client);
     TRACE(`[${name}] Successfully connected to stdio server`);
 
+    // Log server version and capabilities
+    const serverInfo = client.getServerVersion();
+    const serverCapabilities = client.getServerCapabilities();
+    console.log(`\nUpstream server '${name}' connected:`);
+    console.log(`  Version:`, JSON.stringify(serverInfo, null, 2));
+    console.log(`  Capabilities:`, JSON.stringify(serverCapabilities, null, 2));
+
     // Notify the newly connected server about roots if we have a provider
     if (this.rootsProvider) {
       try {
@@ -153,6 +160,13 @@ export class UpstreamServerManager {
       await client.connect(transport);
       this.clients.set(name, client);
       TRACE(`[${name}] Connected to HTTP server`);
+
+      // Log server version and capabilities
+      const serverInfo = client.getServerVersion();
+      const serverCapabilities = client.getServerCapabilities();
+      console.log(`\nUpstream server '${name}' connected:`);
+      console.log(`  Version:`, JSON.stringify(serverInfo, null, 2));
+      console.log(`  Capabilities:`, JSON.stringify(serverCapabilities, null, 2));
 
       // Notify the newly connected server about roots if we have a provider
       if (this.rootsProvider) {

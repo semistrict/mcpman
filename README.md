@@ -6,6 +6,7 @@ A Model Context Protocol (MCP) server manager that acts as a proxy/multiplexer f
 
 MCPMan allows you to:
 - Connect to multiple MCP servers simultaneously (stdio and HTTP transports)
+- Generate and execute code from natural language descriptions using LLMs
 - Execute JavaScript code with access to all connected MCP tools
 - Invoke tools from multiple servers with batch and parallel execution
 - Manage server configurations with OAuth 2.1 support
@@ -36,6 +37,40 @@ mcpman add filesystem --command npx --args @modelcontextprotocol/server-filesyst
 mcpman add api-server --url https://api.example.com/mcp
 ```
 
+### Generate and Execute Code from Natural Language
+
+The `code` tool uses LLMs (via Claude Agent SDK or MCP sampling) to generate JavaScript code from natural language descriptions. Generated code is validated with TypeScript compiler before execution.
+
+```bash
+# Generate code from description
+mcpman code "list all files in the current directory"
+
+# Generate code with custom root directories
+mcpman code "read the package.json file and show the dependencies" --roots /path/to/project
+```
+
+**Features:**
+- **Automatic Code Generation**: LLM writes JavaScript code to accomplish your task
+- **TypeScript Validation**: Generated code is validated with TypeScript compiler API (with up to 3 retries if validation fails)
+- **Type-Safe API**: Generated TypeScript definitions provide autocomplete and type checking for all MCP tools
+- **Server Filtering**: Optional `servers` parameter limits which MCP servers are available to reduce context size and improve code quality
+- **$results Integration**: Generated code results are automatically stored in `$results` array
+
+When using as an MCP tool, strongly recommend specifying the `servers` parameter to limit context:
+
+```javascript
+// Good - limits context to only playwright tools
+{
+  functionDescription: "navigate to google.com and take a screenshot",
+  servers: ["playwright"]
+}
+
+// Avoid - includes all servers which may result in poor performance
+{
+  functionDescription: "navigate to google.com and take a screenshot"
+}
+```
+
 ### Evaluate Function Expressions with MCP Tools
 
 ```bash
@@ -64,6 +99,7 @@ MCPMan operates in two modes:
 
 ### Server Mode
 - Acts as an MCP server exposing multiple tools:
+  - `code` - Generate and execute JavaScript code from natural language descriptions using LLMs with TypeScript validation
   - `eval` - Execute JavaScript with access to all MCP tools
   - `invoke` - Batch invoke tools with parallel/sequential execution
   - `list_servers` - List connected servers and their tools
@@ -122,6 +158,7 @@ mcpman validate                      # Validate configuration
 mcpman test                          # Test server connections
 
 # Execution
+mcpman code "description" [--roots /path]                  # Generate and execute code from natural language
 mcpman eval "function-expr" [--arg '{}'] [--roots /path]   # Execute function expression with MCP tools
 mcpman serve                                               # Run as MCP server
 

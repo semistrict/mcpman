@@ -395,7 +395,7 @@ async function handleInvoke(
           );
 
           // Append to $results and get the index
-          const resultsIndex = evalRuntime.appendResult(toolResult);
+          const resultsIndex = await evalRuntime.appendResult(toolResult);
 
           let resultText = Array.isArray(toolResult)
             ? toolResult
@@ -432,7 +432,7 @@ async function handleInvoke(
         const toolResult = await upstreamServerManager.callTool(serverName, toolName, parameters);
 
         // Append to $results and get the index
-        const resultsIndex = evalRuntime.appendResult(toolResult);
+        const resultsIndex = await evalRuntime.appendResult(toolResult);
 
         let resultText = Array.isArray(toolResult)
           ? toolResult

@@ -62,7 +62,11 @@ export class EvalRuntime {
     };
   }
 
-  appendResult(result: unknown): number {
+  async appendResult(result: unknown): Promise<number> {
+    // Initialize VM context if not already created
+    if (!this.vmContext) {
+      await this.initializeContext();
+    }
     if (!this.vmContext) {
       throw new Error("VM context not initialized");
     }

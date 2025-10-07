@@ -322,6 +322,19 @@ async function handleHelp(
   }
 }
 
+function truncateResult(text: string, resultsIndex: number, maxLength = 250): string {
+  if (text.length <= maxLength) {
+    return text;
+  }
+
+  const truncationMsg = `... (result truncated, see $results[${resultsIndex}] for full result) ...`;
+  const sideLength = Math.floor((maxLength - truncationMsg.length) / 2);
+  const start = text.slice(0, sideLength);
+  const end = text.slice(-sideLength);
+
+  return `${start}${truncationMsg}${end}`;
+}
+
 async function handleInvoke(
   upstreamServerManager: UpstreamServerManager,
   evalRuntime: EvalRuntime,
@@ -384,11 +397,14 @@ async function handleInvoke(
           // Append to $results and get the index
           const resultsIndex = evalRuntime.appendResult(toolResult);
 
-          const resultText = Array.isArray(toolResult)
+          let resultText = Array.isArray(toolResult)
             ? toolResult
                 .map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
                 .join("\n")
             : JSON.stringify(toolResult, null, 2);
+
+          // Truncate if too long
+          resultText = truncateResult(resultText, resultsIndex);
 
           return {
             success: true,
@@ -418,11 +434,14 @@ async function handleInvoke(
         // Append to $results and get the index
         const resultsIndex = evalRuntime.appendResult(toolResult);
 
-        const resultText = Array.isArray(toolResult)
+        let resultText = Array.isArray(toolResult)
           ? toolResult
               .map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
               .join("\n")
           : JSON.stringify(toolResult, null, 2);
+
+        // Truncate if too long
+        resultText = truncateResult(resultText, resultsIndex);
 
         return {
           success: true,

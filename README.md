@@ -23,39 +23,39 @@ bun install
 ### Initialize Configuration
 
 ```bash
-bun cli init
+mcpman init
 ```
 
 ### Add MCP Servers
 
 ```bash
 # Add stdio server
-bun cli add filesystem --command npx --args @modelcontextprotocol/server-filesystem
+mcpman add filesystem --command npx --args @modelcontextprotocol/server-filesystem
 
 # Add HTTP server with OAuth
-bun cli add api-server --url https://api.example.com/mcp
+mcpman add api-server --url https://api.example.com/mcp
 ```
 
 ### Evaluate Function Expressions with MCP Tools
 
 ```bash
 # Simple function with no arguments
-bun cli eval "() => listServers()"
+mcpman eval "() => listServers()"
 
 # Function with argument
-bun cli eval "(arg) => filesystem.listFiles({ path: arg.directory })" --arg '{"directory": "."}'
+mcpman eval "(arg) => filesystem.listFiles({ path: arg.directory })" --arg '{"directory": "."}'
 
 # Specify custom root directories
-bun cli eval "(arg) => filesystem.listFiles({ path: arg.path })" --arg '{"path": "/tmp"}' --roots /tmp
+mcpman eval "(arg) => filesystem.listFiles({ path: arg.path })" --arg '{"path": "/tmp"}' --roots /tmp
 
 # Complex function with console output
-bun cli eval "(arg) => { console.log('Processing:', arg.name); return arg.value * 2; }" --arg '{"name": "test", "value": 21}'
+mcpman eval "(arg) => { console.log('Processing:', arg.name); return arg.value * 2; }" --arg '{"name": "test", "value": 21}'
 ```
 
 ### Run as MCP Server
 
 ```bash
-bun cli serve
+mcpman serve
 ```
 
 ## Architecture
@@ -115,18 +115,18 @@ Configuration is stored in `~/.mcpman/settings.json`:
 
 ```bash
 # Server management
-bun cli init                          # Initialize configuration
-bun cli add <name>                    # Add new server
-bun cli list                          # List configured servers
-bun cli validate                      # Validate configuration
-bun cli test                          # Test server connections
+mcpman init                          # Initialize configuration
+mcpman add <name>                    # Add new server
+mcpman list                          # List configured servers
+mcpman validate                      # Validate configuration
+mcpman test                          # Test server connections
 
 # Execution
-bun cli eval "function-expr" [--arg '{}'] [--roots /path]   # Execute function expression with MCP tools
-bun cli serve                                               # Run as MCP server
+mcpman eval "function-expr" [--arg '{}'] [--roots /path]   # Execute function expression with MCP tools
+mcpman serve                                               # Run as MCP server
 
 # Authentication
-bun cli auth <server-name>            # Authenticate with OAuth server
+mcpman auth <server-name>            # Authenticate with OAuth server
 ```
 
 ## JavaScript Execution Environment
@@ -209,7 +209,7 @@ Logs use synchronous writes to ensure all messages are captured, even during cra
 
 ```bash
 # Enable trace logging
-MCPMAN_TRACE=1 bun cli serve
+MCPMAN_TRACE=1 mcpman serve
 
 # View logs
 tail -f ~/.mcpman/mcpman.log

@@ -93,7 +93,35 @@ function registerTools(
     async ({ code, arg }) => {
       await initializedMcpServer; // Wait for upstream servers to be connected
       const result = await evalRuntime.eval(code, arg);
-      return formatEvalResult(result);
+
+      // Combine result and output for storage in $results
+      let combinedResult: unknown;
+      if (result.output) {
+        // If there's output, combine it with the result
+        if (typeof result.result === "string") {
+          combinedResult = `${result.result}\n${result.output}`;
+        } else if (typeof result.result === "object" && result.result !== null) {
+          combinedResult = `${JSON.stringify(result.result)}\n${result.output}`;
+        } else {
+          combinedResult = `${String(result.result)}\n${result.output}`;
+        }
+      } else {
+        combinedResult = result.result;
+      }
+
+      // Store combined result in $results and get index
+      const resultsIndex = await evalRuntime.appendResult(combinedResult);
+
+      // Format output with $results pointer
+      const formattedOutput = formatResultOutput(resultsIndex, "eval", combinedResult);
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: formattedOutput,
+          },
+        ],
+      };
     }
   );
   TRACE("Eval tool registered");
@@ -312,6 +340,34 @@ function truncateResult(text: string, resultsIndex: number, maxLength = 250): st
   return `${start}${truncationMsg}${end}`;
 }
 
+function formatResultOutput(resultsIndex: number, label: string, rawResult: unknown): string {
+  // Convert result to text
+  let resultText: string;
+  if (Array.isArray(rawResult)) {
+    resultText = rawResult
+      .map((item) =>
+        typeof item === "object" &&
+        item !== null &&
+        "type" in item &&
+        item.type === "text" &&
+        "text" in item
+          ? item.text
+          : JSON.stringify(item)
+      )
+      .join("\n");
+  } else if (typeof rawResult === "object" && rawResult !== null) {
+    resultText = JSON.stringify(rawResult, null, 2);
+  } else {
+    resultText = String(rawResult);
+  }
+
+  // Truncate if needed
+  resultText = truncateResult(resultText, resultsIndex);
+
+  // Format with $results pointer
+  return `$results[${resultsIndex}] = // ${label}\n${resultText}`;
+}
+
 function unwrapToolResult(toolResult: unknown): unknown {
   // If it's an array of content items, unwrap them
   if (Array.isArray(toolResult)) {
@@ -392,20 +448,18 @@ async function handleInvoke(
           const unwrappedResult = unwrapToolResult(toolResult);
           const resultsIndex = await evalRuntime.appendResult(unwrappedResult);
 
-          let resultText = Array.isArray(toolResult)
-            ? toolResult
-                .map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
-                .join("\n")
-            : JSON.stringify(toolResult, null, 2);
-
-          // Truncate if too long
-          resultText = truncateResult(resultText, resultsIndex);
+          // Format output with shared function
+          const formattedOutput = formatResultOutput(
+            resultsIndex,
+            `${serverName}.${toolName}`,
+            toolResult
+          );
 
           return {
             success: true,
             result: {
               type: "text" as const,
-              text: `$results[${resultsIndex}] = // ${serverName}.${toolName}\n${resultText}`,
+              text: formattedOutput,
             },
             toolResult,
             resultsIndex,
@@ -430,20 +484,18 @@ async function handleInvoke(
         const unwrappedResult = unwrapToolResult(toolResult);
         const resultsIndex = await evalRuntime.appendResult(unwrappedResult);
 
-        let resultText = Array.isArray(toolResult)
-          ? toolResult
-              .map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
-              .join("\n")
-          : JSON.stringify(toolResult, null, 2);
-
-        // Truncate if too long
-        resultText = truncateResult(resultText, resultsIndex);
+        // Format output with shared function
+        const formattedOutput = formatResultOutput(
+          resultsIndex,
+          `${serverName}.${toolName}`,
+          toolResult
+        );
 
         return {
           success: true,
           result: {
             type: "text" as const,
-            text: `$results[${resultsIndex}] = // ${serverName}.${toolName}\n${resultText}`,
+            text: formattedOutput,
           },
           toolResult,
           resultsIndex,

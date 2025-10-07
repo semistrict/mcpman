@@ -30,7 +30,7 @@ describe('Eval with Argument Test', () => {
     });
 
     const content = result.content as Array<{type: string, text: string}>;
-    expect(content[0]?.text).toBe('Result: 42');
+    expect(content[0]?.text).toBe('$results[0] = // eval\n42');
   });
 
   it('should execute function without argument', async () => {
@@ -42,7 +42,7 @@ describe('Eval with Argument Test', () => {
     });
 
     const content = result.content as Array<{type: string, text: string}>;
-    expect(content[0]?.text).toBe('Result: hello world');
+    expect(content[0]?.text).toBe('$results[1] = // eval\nhello world');
   });
 
   it('should execute async function with argument', async () => {
@@ -55,7 +55,7 @@ describe('Eval with Argument Test', () => {
     });
 
     const content = result.content as Array<{type: string, text: string}>;
-    expect(content[0]?.text).toBe('Result: TEST');
+    expect(content[0]?.text).toBe('$results[2] = // eval\nTEST');
   });
 
   it('should execute function with complex argument object', async () => {
@@ -71,7 +71,7 @@ describe('Eval with Argument Test', () => {
     });
 
     const content = result.content as Array<{type: string, text: string}>;
-    expect(content[0]?.text).toContain('Result: 3');
+    expect(content[0]?.text).toContain('$results[3] = // eval\n3');
     expect(content[0]?.text).toContain('[LOG] Processing: alice');
   });
 
@@ -85,7 +85,7 @@ describe('Eval with Argument Test', () => {
     });
 
     const content = result.content as Array<{type: string, text: string}>;
-    expect(content[0]?.text).toContain('Result: true');
+    expect(content[0]?.text).toContain('$results[4] = // eval\ntrue');
     expect(content[0]?.text).toContain('[LOG] Checking for MCP context');
   });
 
@@ -116,7 +116,7 @@ describe('Eval with Argument Test', () => {
     });
 
     const content = result.content as Array<{type: string, text: string}>;
-    expect(content[0]?.text).toBe('Result: true');
+    expect(content[0]?.text).toBe('$results[5] = // eval\ntrue');
   });
 
   it('should call filesystem server tools via eval', async () => {
@@ -128,6 +128,6 @@ describe('Eval with Argument Test', () => {
     });
 
     const content = result.content as Array<{type: string, text: string}>;
-    expect(content[0]?.text).toBe('Result: true');
+    expect(content[0]?.text).toBe('$results[6] = // eval\ntrue');
   });
 });

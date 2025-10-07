@@ -53,7 +53,7 @@ describe("Invoke Before Eval Test", () => {
     const content = evalResult.content as Array<{ type: string; text: string }>;
     const textContent = content.find((c) => c.type === "text");
     expect(textContent).toBeDefined();
-    expect(textContent?.text).toBe("Result: 1");
+    expect(textContent?.text).toBe("$results[1] = // eval\n1");
   });
 
   it("should store invoke results in $results array accessible from eval", async () => {
@@ -88,6 +88,6 @@ describe("Invoke Before Eval Test", () => {
     const content = evalResult.content as Array<{ type: string; text: string }>;
     const textContent = content.find((c) => c.type === "text");
     expect(textContent).toBeDefined();
-    expect(textContent?.text).toBe("Result: string");
+    expect(textContent?.text).toBe("$results[3] = // eval\nstring");
   });
 });

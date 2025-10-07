@@ -30,7 +30,7 @@ describe('Eval Persistence Integration Test', () => {
     });
 
     const content1 = result1.content as Array<{type: string, text: string}>;
-    expect(content1[0]?.text).toBe('Result: 42');
+    expect(content1[0]?.text).toBe('$results[0] = // eval\n42');
 
     // Second eval: use the variable (should persist)
     const result2 = await client.callTool({
@@ -41,7 +41,7 @@ describe('Eval Persistence Integration Test', () => {
     });
 
     const content2 = result2.content as Array<{type: string, text: string}>;
-    expect(content2[0]?.text).toBe('Result: 50');
+    expect(content2[0]?.text).toBe('$results[1] = // eval\n50');
 
     // Third eval: modify the variable
     const result3 = await client.callTool({
@@ -52,7 +52,7 @@ describe('Eval Persistence Integration Test', () => {
     });
 
     const content3 = result3.content as Array<{type: string, text: string}>;
-    expect(content3[0]?.text).toBe('Result: 50');
+    expect(content3[0]?.text).toBe('$results[2] = // eval\n50');
 
     // Fourth eval: multiply and verify persistence
     const result4 = await client.callTool({
@@ -63,7 +63,7 @@ describe('Eval Persistence Integration Test', () => {
     });
 
     const content4 = result4.content as Array<{type: string, text: string}>;
-    expect(content4[0]?.text).toBe('Result: 100');
+    expect(content4[0]?.text).toBe('$results[3] = // eval\n100');
   });
 
   it('should persist function definitions', async () => {
@@ -84,7 +84,7 @@ describe('Eval Persistence Integration Test', () => {
     });
 
     const content2 = result2.content as Array<{type: string, text: string}>;
-    expect(content2[0]?.text).toBe('Result: 30');
+    expect(content2[0]?.text).toBe('$results[5] = // eval\n30');
 
     // Redefine the function
     const result3 = await client.callTool({
@@ -103,7 +103,7 @@ describe('Eval Persistence Integration Test', () => {
     });
 
     const content4 = result4.content as Array<{type: string, text: string}>;
-    expect(content4[0]?.text).toBe('Result: 200');
+    expect(content4[0]?.text).toBe('$results[7] = // eval\n200');
   });
 
   it('should persist objects and complex data structures', async () => {
@@ -116,7 +116,7 @@ describe('Eval Persistence Integration Test', () => {
     });
 
     const content1 = result1.content as Array<{type: string, text: string}>;
-    expect(content1[0]?.text).toBe('Result: 0');
+    expect(content1[0]?.text).toBe('$results[8] = // eval\n0');
 
     // Modify the object
     const result2 = await client.callTool({
@@ -126,9 +126,9 @@ describe('Eval Persistence Integration Test', () => {
       },
     });
 
-    // With CallToolResult parsing, object results are wrapped in content array
+    // With new format, object results are formatted after the $results assignment
     const content2 = result2.content as Array<{type: string, text: string}>;
-    const dataStr = content2[0]?.text.replace('Result: ', '') || '';
+    const dataStr = content2[0]?.text.split('\n').slice(1).join('\n') || '';
     const data = JSON.parse(dataStr);
     expect(data.count).toBe(1);
     expect(data.items).toEqual(['hello']);
@@ -142,6 +142,6 @@ describe('Eval Persistence Integration Test', () => {
     });
 
     const content3 = result3.content as Array<{type: string, text: string}>;
-    expect(content3[0]?.text).toBe('Result: 1');
+    expect(content3[0]?.text).toBe('$results[10] = // eval\n1');
   });
 });

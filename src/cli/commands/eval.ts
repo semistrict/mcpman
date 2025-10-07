@@ -1,4 +1,4 @@
-import { command, positional, string, option } from "cmd-ts";
+import { command, option, positional, string } from "cmd-ts";
 import { loadConfig } from "../../config/loader.js";
 import { EvalRuntime } from "../../eval/runtime.js";
 import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";

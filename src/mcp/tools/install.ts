@@ -1,15 +1,15 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
-import type { UpstreamServerManager } from "../upstream-server-manager.js";
+import {
+  ConfigError,
+  createDefaultConfig,
+  ensureConfigDir,
+  getConfigPath,
+  loadConfig,
+} from "../../config/loader.js";
 import type { ServerConfig } from "../../config/schema.js";
 import { TRACE } from "../../utils/logging.js";
-import {
-  loadConfig,
-  getConfigPath,
-  ensureConfigDir,
-  createDefaultConfig,
-  ConfigError,
-} from "../../config/loader.js";
+import type { UpstreamServerManager } from "../upstream-server-manager.js";
 
 export function registerInstallTool(
   mcpServer: McpServer,

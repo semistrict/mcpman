@@ -5,13 +5,13 @@ import { StreamableHTTPClientTransport } from "@modelcontextprotocol/sdk/client/
 import type { ListToolsResult, Root, Tool } from "@modelcontextprotocol/sdk/types.js";
 import { ListRootsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { MCPManOAuthProvider } from "../auth/oauth-provider.js";
-import { TRACE } from "../utils/logging.js";
 import type {
   HttpServerConfig,
   ServerConfig,
   Settings,
   StdioServerConfig,
 } from "../config/schema.js";
+import { TRACE } from "../utils/logging.js";
 
 type RootsProvider = () => Promise<Root[]>;
 

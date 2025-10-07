@@ -33,6 +33,7 @@ export async function loadConfig(): Promise<Settings> {
   const configPath = getConfigPath();
 
   try {
+    console.log(`Reading config from: ${configPath}`);
     const file = Bun.file(configPath);
     const exists = await file.exists();
 
@@ -43,7 +44,9 @@ export async function loadConfig(): Promise<Settings> {
     const text = await file.text();
     const json = JSON.parse(text);
 
-    return SettingsSchema.parse(json);
+    const config = SettingsSchema.parse(json);
+    console.log("Config parsed successfully");
+    return config;
   } catch (error) {
     if (error instanceof z.ZodError) {
       const messages = error.errors.map((e) => `${e.path.join(".")}: ${e.message}`);

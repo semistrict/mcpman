@@ -6,7 +6,7 @@ import { OAuthCallbackServer } from "../../auth/callback-server.js";
 import { MCPManOAuthProvider } from "../../auth/oauth-provider.js";
 import { TokenStorage } from "../../auth/token-storage.js";
 import { ConfigError, loadConfig } from "../../config/loader.js";
-import { ServerConfigSchema, type HttpServerConfig, type Settings } from "../../config/schema.js";
+import { type HttpServerConfig, ServerConfigSchema, type Settings } from "../../config/schema.js";
 
 export const authCommand = command({
   name: "auth",

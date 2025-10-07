@@ -1,8 +1,8 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EvalRuntime } from "../../eval/runtime.js";
-import type { UpstreamServerManager } from "../upstream-server-manager.js";
 import { TRACE } from "../../utils/logging.js";
+import type { UpstreamServerManager } from "../upstream-server-manager.js";
 import { formatResultOutput } from "./eval.js";
 
 export function registerInvokeTool(

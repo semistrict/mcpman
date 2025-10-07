@@ -1,14 +1,14 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import type { EvalRuntime } from "../eval/runtime.js";
-import type { UpstreamServerManager } from "./upstream-server-manager.js";
 import { TRACE } from "../utils/logging.js";
 import { registerEvalTool } from "./tools/eval.js";
-import { registerListServersTool } from "./tools/list_servers.js";
 import { registerHelpTool } from "./tools/help.js";
-import { registerInvokeTool } from "./tools/invoke.js";
 import { registerInstallTool } from "./tools/install.js";
+import { registerInvokeTool } from "./tools/invoke.js";
+import { registerListServersTool } from "./tools/list_servers.js";
 import { registerOpenUITool } from "./tools/open_ui.js";
+import type { UpstreamServerManager } from "./upstream-server-manager.js";
 
 const mcpServer: McpServer = new McpServer({
   name: "mcpman",

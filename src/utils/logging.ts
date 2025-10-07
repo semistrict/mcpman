@@ -1,10 +1,10 @@
-import { createWriteStream, type WriteStream } from "node:fs";
-import { dirname } from "node:path";
+import { closeSync, openSync, writeSync } from "node:fs";
 import { homedir } from "node:os";
+import { dirname } from "node:path";
 import { getConfigDir } from "../config/loader.js";
 
-let logStream: WriteStream | null = null;
-let traceStream: WriteStream | null = null;
+let logFd: number | null = null;
+let traceFd: number | null = null;
 let originalConsole: {
   log: typeof console.log;
   error: typeof console.error;
@@ -31,8 +31,13 @@ export function redirectConsole(): void {
     return;
   }
 
-  // Create log stream
-  logStream = createWriteStream(logPath, { flags: "a" });
+  // Open log file descriptor once for synchronous writes
+  try {
+    logFd = openSync(logPath, "a");
+  } catch (error) {
+    console.error(`Failed to open log file: ${error}`);
+    return;
+  }
 
   // Store original console methods
   originalConsole = {
@@ -46,11 +51,31 @@ export function redirectConsole(): void {
   const writeToLog = (level: string, args: unknown[]) => {
     const timestamp = new Date().toISOString();
     const message = args
-      .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
+      .map((arg) => {
+        if (typeof arg === "string") {
+          return arg;
+        }
+        if (arg instanceof Error) {
+          let errorStr = `${arg.name}: ${arg.message}`;
+          if (arg.stack) {
+            errorStr += `\n${arg.stack}`;
+          }
+          if (arg.cause) {
+            errorStr += `\nCaused by: ${arg.cause instanceof Error ? arg.cause.message : String(arg.cause)}`;
+          }
+          return errorStr;
+        }
+        return JSON.stringify(arg);
+      })
       .join(" ");
 
-    if (logStream) {
-      logStream.write(`[${timestamp}] ${level}: ${message}\n`);
+    if (logFd !== null) {
+      // Use synchronous write to ensure logs are written even if process crashes
+      try {
+        writeSync(logFd, `[${timestamp}] ${level}: ${message}\n`);
+      } catch (_error) {
+        // Can't log this error since console is redirected
+      }
     }
   };
 
@@ -77,7 +102,7 @@ export function TRACE(...args: unknown[]): void {
     return;
   }
 
-  if (!traceStream) {
+  if (traceFd === null) {
     const tracePath = `${homedir()}/.mcpman/trace.log`;
 
     // Ensure directory exists
@@ -89,7 +114,12 @@ export function TRACE(...args: unknown[]): void {
       return;
     }
 
-    traceStream = createWriteStream(tracePath, { flags: "a" });
+    try {
+      traceFd = openSync(tracePath, "a");
+    } catch (error) {
+      console.error(`Failed to open trace file: ${error}`);
+      return;
+    }
   }
 
   // Get caller file and line number
@@ -118,8 +148,12 @@ export function TRACE(...args: unknown[]): void {
     .map((arg) => (typeof arg === "string" ? arg : JSON.stringify(arg)))
     .join(" ");
 
-  if (traceStream) {
-    traceStream.write(`[${timestamp}] TRACE [${location}]: ${message}\n`);
+  if (traceFd !== null) {
+    try {
+      writeSync(traceFd, `[${timestamp}] TRACE [${location}]: ${message}\n`);
+    } catch (_error) {
+      // Can't log this error since console is redirected
+    }
   }
 }
 
@@ -133,14 +167,22 @@ export function restoreConsole(): void {
     originalConsole = null;
   }
 
-  if (logStream) {
-    logStream.end();
-    logStream = null;
+  if (logFd !== null) {
+    try {
+      closeSync(logFd);
+    } catch (_error) {
+      // Ignore errors when closing
+    }
+    logFd = null;
   }
 
-  if (traceStream) {
-    traceStream.end();
-    traceStream = null;
+  if (traceFd !== null) {
+    try {
+      closeSync(traceFd);
+    } catch (_error) {
+      // Ignore errors when closing
+    }
+    traceFd = null;
   }
 }
 

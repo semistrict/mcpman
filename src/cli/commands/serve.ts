@@ -1,8 +1,8 @@
 import { command } from "cmd-ts";
 import { loadConfig } from "../../config/loader.js";
 import { EvalRuntime } from "../../eval/runtime.js";
-import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
 import { createMcpServer, disconnectMcpServer, getMcpServer } from "../../mcp/server.js";
+import { UpstreamServerManager } from "../../mcp/upstream-server-manager.js";
 
 export const serveCommand = command({
   name: "serve",

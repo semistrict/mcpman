@@ -1,4 +1,4 @@
-import { CallToolResultSchema, type CallToolResult } from "@modelcontextprotocol/sdk/types.js";
+import type { CallToolResult, ContentBlock } from "@modelcontextprotocol/sdk/types.js";
 
 export function tryParseAsCallToolResult(result: unknown): CallToolResult | null {
   // Check if result is a content array from upstream server
@@ -10,7 +10,7 @@ export function tryParseAsCallToolResult(result: unknown): CallToolResult | null
 
     if (isContent) {
       return {
-        content: result as any[],
+        content: result as ContentBlock[],
       };
     }
   }

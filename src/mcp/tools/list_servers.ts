@@ -1,6 +1,6 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import type { UpstreamServerManager } from "../upstream-server-manager.js";
 import { TRACE } from "../../utils/logging.js";
+import type { UpstreamServerManager } from "../upstream-server-manager.js";
 
 interface ServerInfo {
   connected: boolean;

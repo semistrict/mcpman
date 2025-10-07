@@ -69,7 +69,6 @@ MCPMan operates in two modes:
   - `list_servers` - List connected servers and their tools
   - `help` - Get documentation for specific tools
   - `install` - Dynamically add new servers
-  - `open_ui` - Open web interface
 - Connects to multiple upstream MCP servers
 - Transparently forwards root directory information from clients to upstream servers
 - Provides unified JavaScript execution environment with $results array

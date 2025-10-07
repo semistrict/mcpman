@@ -29,7 +29,7 @@ MCPMan is a Model Context Protocol (MCP) server manager that acts as a proxy/mul
 - `src/eval/proxy.ts`: Creates server proxies for eval environment
 - `src/eval/runtime.ts`: VM context with $results array for storing tool outputs
 - `src/cli/commands/`: CLI command implementations
-- `src/mcp/tools/`: Individual MCP tool implementations (eval, invoke, list_servers, help, install, open_ui)
+- `src/mcp/tools/`: Individual MCP tool implementations (eval, invoke, list_servers, help, install)
 
 ## Development Commands
 
@@ -114,7 +114,6 @@ MCPMan exposes the following tools when running as an MCP server:
 3. **list_servers** - List all connected MCP servers and their available tools
 4. **help** - Get help information about specific MCP tools from connected servers
 5. **install** - Add new MCP servers to configuration dynamically
-6. **open_ui** - Open the MCPMan web UI in system browser (if web server is running)
 
 ### Tool Examples
 

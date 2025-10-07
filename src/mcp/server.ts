@@ -7,7 +7,6 @@ import { registerHelpTool } from "./tools/help.js";
 import { registerInstallTool } from "./tools/install.js";
 import { registerInvokeTool } from "./tools/invoke.js";
 import { registerListServersTool } from "./tools/list_servers.js";
-import { registerOpenUITool } from "./tools/open_ui.js";
 import type { UpstreamServerManager } from "./upstream-server-manager.js";
 
 const mcpServer: McpServer = new McpServer({
@@ -28,8 +27,7 @@ const initializedMcpServer: Promise<McpServer> = new Promise<McpServer>((resolve
 
 export function createMcpServer(
   evalRuntime: EvalRuntime,
-  upstreamServerManager: UpstreamServerManager,
-  serverPort?: number
+  upstreamServerManager: UpstreamServerManager
 ): Promise<McpServer> {
   TRACE("Creating MCP server with oninitialized callback");
 
@@ -51,7 +49,7 @@ export function createMcpServer(
   };
 
   // Register tools immediately with static descriptions
-  registerTools(mcpServer, evalRuntime, upstreamServerManager, serverPort);
+  registerTools(mcpServer, evalRuntime, upstreamServerManager);
 
   connectMcpServer();
 
@@ -62,8 +60,7 @@ export function createMcpServer(
 function registerTools(
   mcpServer: McpServer,
   evalRuntime: EvalRuntime,
-  upstreamServerManager: UpstreamServerManager,
-  serverPort?: number
+  upstreamServerManager: UpstreamServerManager
 ) {
   TRACE("Registering MCP server tools...");
   registerEvalTool(mcpServer, evalRuntime, initializedMcpServer);
@@ -71,7 +68,6 @@ function registerTools(
   registerHelpTool(mcpServer, upstreamServerManager, initializedMcpServer);
   registerInvokeTool(mcpServer, upstreamServerManager, evalRuntime, initializedMcpServer);
   registerInstallTool(mcpServer, upstreamServerManager, initializedMcpServer);
-  registerOpenUITool(mcpServer, serverPort, initializedMcpServer);
   TRACE("All tools registered successfully");
 }
 

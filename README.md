@@ -132,6 +132,8 @@ bun cli auth <server-name>            # Authenticate with OAuth server
 
 ## JavaScript Execution Environment
 
+> **Inspired by [Cloudflare's Code Mode](https://blog.cloudflare.com/code-mode/)** - Instead of directly calling MCP tools, LLMs write code that interacts with a JavaScript API. This approach leverages LLMs' strength in writing code and enables more sophisticated tool chaining and composition.
+
 In the eval environment, each configured server is available as a global object. All code must be provided as function expressions:
 
 ```javascript

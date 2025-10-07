@@ -69,16 +69,14 @@ function registerTools(
 ) {
   TRACE("Registering MCP server tools...");
 
-  // Generate static description with configured server names
-  const staticDescription = generateStaticEvalDescription(upstreamServerManager);
-
   // Register eval tool
   TRACE("Registering eval tool");
   mcpServer.registerTool(
     "eval",
     {
       title: "JavaScript Evaluator",
-      description: staticDescription,
+      description:
+        "Execute a JavaScript function expression with access to MCP tools. Results from the invoke tool are stored in the $results array.",
       inputSchema: {
         code: z
           .string()
@@ -189,27 +187,6 @@ function registerTools(
 
 export function getMcpServer(): Promise<McpServer> {
   return initializedMcpServer;
-}
-
-function generateStaticEvalDescription(upstreamServerManager: UpstreamServerManager): string {
-  const configuredServers = upstreamServerManager.getConfiguredServers();
-
-  let description =
-    "Execute a JavaScript function expression with access to MCP tools and a parameter object.\n\n";
-
-  if (configuredServers.length === 0) {
-    description += "No MCP servers configured.";
-  } else {
-    description += "Configured MCP servers:\n\n";
-    for (const serverName of configuredServers) {
-      description += `• ${serverName}\n`;
-    }
-    description +=
-      "\nUse serverName.toolName(args) to call tools (e.g., filesystem.list_directory({path: '.'}))\n";
-    description += "Use help('serverName') to list available tools for each server.";
-  }
-
-  return description;
 }
 
 async function handleListServers(upstreamServerManager: UpstreamServerManager) {
@@ -327,12 +304,30 @@ function truncateResult(text: string, resultsIndex: number, maxLength = 250): st
     return text;
   }
 
-  const truncationMsg = `... (result truncated, see $results[${resultsIndex}] for full result) ...`;
+  const truncationMsg = `\n\n... (result truncated, see $results[${resultsIndex}] for full result) ...\n\n`;
   const sideLength = Math.floor((maxLength - truncationMsg.length) / 2);
   const start = text.slice(0, sideLength);
   const end = text.slice(-sideLength);
 
   return `${start}${truncationMsg}${end}`;
+}
+
+function unwrapToolResult(toolResult: unknown): unknown {
+  // If it's an array of content items, unwrap them
+  if (Array.isArray(toolResult)) {
+    // If single text item, return just the text
+    if (toolResult.length === 1 && toolResult[0]?.type === "text" && "text" in toolResult[0]) {
+      return toolResult[0].text;
+    }
+    // If multiple items, return array of unwrapped items
+    return toolResult.map((item) => {
+      if (item?.type === "text" && "text" in item) {
+        return item.text;
+      }
+      return item;
+    });
+  }
+  return toolResult;
 }
 
 async function handleInvoke(
@@ -351,7 +346,6 @@ async function handleInvoke(
     resultsIndex?: number;
   }> => {
     const { server: serverName, tool: toolName, parameters } = call;
-    const heading = `\n## [${index}] ${serverName}.${toolName}\n`;
 
     const client = upstreamServerManager.getClient(serverName);
     if (!client) {
@@ -359,7 +353,7 @@ async function handleInvoke(
         success: false,
         result: {
           type: "text" as const,
-          text: `${heading}Error: Server '${serverName}' not found. Available servers: ${upstreamServerManager.getConnectedServers().join(", ")}`,
+          text: `Error: Server '${serverName}' not found. Available servers: ${upstreamServerManager.getConnectedServers().join(", ")}`,
         },
       };
     }
@@ -375,7 +369,7 @@ async function handleInvoke(
           success: false,
           result: {
             type: "text" as const,
-            text: `${heading}Error: Tool '${toolName}' not found in server '${serverName}'. Available tools: ${tools.map((t) => t.name).join(", ")}`,
+            text: `Error: Tool '${toolName}' not found in server '${serverName}'. Available tools: ${tools.map((t) => t.name).join(", ")}`,
           },
         };
       }
@@ -394,8 +388,9 @@ async function handleInvoke(
             validatedParams
           );
 
-          // Append to $results and get the index
-          const resultsIndex = await evalRuntime.appendResult(toolResult);
+          // Unwrap and append to $results
+          const unwrappedResult = unwrapToolResult(toolResult);
+          const resultsIndex = await evalRuntime.appendResult(unwrappedResult);
 
           let resultText = Array.isArray(toolResult)
             ? toolResult
@@ -410,7 +405,7 @@ async function handleInvoke(
             success: true,
             result: {
               type: "text" as const,
-              text: `${heading}Result saved to $results[${resultsIndex}]\n\n${resultText}`,
+              text: `$results[${resultsIndex}] = // ${serverName}.${toolName}\n${resultText}`,
             },
             toolResult,
             resultsIndex,
@@ -421,7 +416,7 @@ async function handleInvoke(
               success: false,
               result: {
                 type: "text" as const,
-                text: `${heading}Parameter validation error: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
+                text: `Parameter validation error: ${error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ")}`,
               },
             };
           }
@@ -431,8 +426,9 @@ async function handleInvoke(
         // No schema to validate against, call directly
         const toolResult = await upstreamServerManager.callTool(serverName, toolName, parameters);
 
-        // Append to $results and get the index
-        const resultsIndex = await evalRuntime.appendResult(toolResult);
+        // Unwrap and append to $results
+        const unwrappedResult = unwrapToolResult(toolResult);
+        const resultsIndex = await evalRuntime.appendResult(unwrappedResult);
 
         let resultText = Array.isArray(toolResult)
           ? toolResult
@@ -447,7 +443,7 @@ async function handleInvoke(
           success: true,
           result: {
             type: "text" as const,
-            text: `${heading}Result saved to $results[${resultsIndex}]\n\n${resultText}`,
+            text: `$results[${resultsIndex}] = // ${serverName}.${toolName}\n${resultText}`,
           },
           toolResult,
           resultsIndex,
@@ -458,7 +454,7 @@ async function handleInvoke(
         success: false,
         result: {
           type: "text" as const,
-          text: `${heading}Error invoking tool '${toolName}' on server '${serverName}': ${error instanceof Error ? error.message : String(error)}`,
+          text: `Error invoking tool '${toolName}' on server '${serverName}': ${error instanceof Error ? error.message : String(error)}`,
         },
       };
     }

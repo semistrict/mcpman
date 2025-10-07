@@ -74,11 +74,11 @@ describe("Invoke Before Eval Test", () => {
 
     expect(invokeResult.isError).toBeFalsy();
 
-    // Access the stored result from eval - check it's an array
+    // Access the stored result from eval - check it's a string (unwrapped)
     const evalResult = await client.callTool({
       name: "eval",
       arguments: {
-        code: "() => Array.isArray($results[$results.length - 1])",
+        code: "() => typeof $results[$results.length - 1]",
       },
     });
 
@@ -88,6 +88,6 @@ describe("Invoke Before Eval Test", () => {
     const content = evalResult.content as Array<{ type: string; text: string }>;
     const textContent = content.find((c) => c.type === "text");
     expect(textContent).toBeDefined();
-    expect(textContent?.text).toBe("Result: true");
+    expect(textContent?.text).toBe("Result: string");
   });
 });

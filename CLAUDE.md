@@ -113,3 +113,4 @@ Examples:
 - `eval` tool with no argument: `() => listServers()`
 - `eval` tool with argument: `(arg) => filesystem.listFiles({path: arg.directory})`
 - Always run tests with bun run test, not bun test
+- Do not use bun test use bun run test

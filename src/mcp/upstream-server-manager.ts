@@ -251,6 +251,16 @@ export class UpstreamServerManager {
     this.notifyRootsChanged();
   }
 
+  async addServer(name: string, config: ServerConfig): Promise<void> {
+    TRACE(`Adding new server '${name}' to configuration`);
+    // Add to settings
+    this.settings.servers[name] = config;
+    // Connect the new server if not disabled
+    if (!config.disabled) {
+      await this.connectServer(name, config);
+    }
+  }
+
   async disconnect(): Promise<void> {
     // Close all clients
     for (const [name, client] of this.clients) {

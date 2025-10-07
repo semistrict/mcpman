@@ -6,27 +6,30 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 MCPMan is a Model Context Protocol (MCP) server manager that acts as a proxy/multiplexer for multiple MCP servers. It provides:
 
-- **Client Management**: Connects to multiple MCP servers via stdio or HTTP transports with OAuth 2.1 support
-- **Eval Runtime**: JavaScript execution environment with access to all connected MCP tools
-- **MCP Server**: Exposes `eval` and `list_servers` tools to clients
+- **Upstream Server Management**: Connects to multiple MCP servers via stdio or HTTP transports with OAuth 2.1 support
+- **Eval Runtime**: JavaScript execution environment with access to all connected MCP tools and $results array
+- **MCP Server**: Exposes tools for evaluation, tool invocation, server management, and help
 - **CLI Commands**: Management commands for configuration, testing, and serving
 
 ## Architecture
 
 ### Core Components
 
-- **ClientManager** (`src/mcp/client-manager.ts`): Manages connections to upstream MCP servers
-- **MCPServer** (`src/mcp/server.ts`): Exposes MCPMan as an MCP server with eval capabilities
-- **EvalRuntime** (`src/eval/runtime.ts`): Sandboxed JavaScript execution with MCP tool access
+- **UpstreamServerManager** (`src/mcp/upstream-server-manager.ts`): Manages connections to upstream MCP servers
+- **MCPServer** (`src/mcp/server.ts`): Exposes MCPMan as an MCP server with tools in `src/mcp/tools/`
+- **EvalRuntime** (`src/eval/runtime.ts`): Sandboxed JavaScript execution with MCP tool access and $results array
 - **Configuration** (`src/config/`): Zod-based schema validation for server configs
 - **OAuth Provider** (`src/auth/`): OAuth 2.1 implementation for HTTP MCP servers
+- **Logging** (`src/utils/logging.ts`): Synchronous file logging with error stack trace support
 
 ### Key Files
 
 - `index.ts`: Main entry point - CLI mode or server mode based on arguments
 - `src/config/schema.ts`: Configuration schema for stdio/HTTP servers with OAuth
 - `src/eval/proxy.ts`: Creates server proxies for eval environment
+- `src/eval/runtime.ts`: VM context with $results array for storing tool outputs
 - `src/cli/commands/`: CLI command implementations
+- `src/mcp/tools/`: Individual MCP tool implementations (eval, invoke, list_servers, help, install, open_ui)
 
 ## Development Commands
 
@@ -102,15 +105,32 @@ MCPMan acts as a transparent proxy for MCP roots:
 - In CLI eval mode: Uses `--roots` option or defaults to current directory
 - Upstream servers receive proper root directories for filesystem access
 
-## Tool Usage
+## MCP Tools Exposed
 
-When developing, remember that MCPMan's primary function is exposing an `eval` tool that executes function expressions with access to all connected MCP servers. The eval tool requires:
+MCPMan exposes the following tools when running as an MCP server:
 
-- **code**: A function expression (e.g., `(arg) => arg.value * 2` or `() => filesystem.listFiles({path: '.'})`)
-- **arg**: Optional JSON object passed as parameter to the function
+1. **eval** - Execute JavaScript function expressions with access to all connected MCP tools. Results stored in $results array.
+2. **invoke** - Invoke tools from upstream servers with schema validation. Supports parallel and sequential batch invocations. Results stored in $results array.
+3. **list_servers** - List all connected MCP servers and their available tools
+4. **help** - Get help information about specific MCP tools from connected servers
+5. **install** - Add new MCP servers to configuration dynamically
+6. **open_ui** - Open the MCPMan web UI in system browser (if web server is running)
 
-Examples:
-- `eval` tool with no argument: `() => listServers()`
-- `eval` tool with argument: `(arg) => filesystem.listFiles({path: arg.directory})`
-- Always run tests with bun run test, not bun test
-- Do not use bun test use bun run test
+### Tool Examples
+
+```javascript
+// eval tool - execute function with MCP access
+{ code: "() => listServers()", arg: null }
+{ code: "(arg) => filesystem.listFiles({path: arg.directory})", arg: {"directory": "."} }
+
+// invoke tool - call upstream tools with validation
+{ calls: [{ server: "filesystem", tool: "read_file", parameters: {path: "README.md"} }], parallel: false }
+
+// $results array - access previous results
+{ code: "() => $results[0]", arg: null }
+```
+
+## Testing
+
+- Always run tests with `bun run test`, not `bun test`
+- Do not use `bun test`, use `bun run test`

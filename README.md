@@ -7,8 +7,10 @@ A Model Context Protocol (MCP) server manager that acts as a proxy/multiplexer f
 MCPMan allows you to:
 - Connect to multiple MCP servers simultaneously (stdio and HTTP transports)
 - Execute JavaScript code with access to all connected MCP tools
+- Invoke tools from multiple servers with batch and parallel execution
 - Manage server configurations with OAuth 2.1 support
-- Provide unified access to tools from different MCP servers
+- Dynamically add new servers without restarting
+- Store and access tool results through $results array
 
 ## Quick Start
 
@@ -61,10 +63,16 @@ bun cli serve
 MCPMan operates in two modes:
 
 ### Server Mode
-- Acts as an MCP server exposing `eval` and `list_servers` tools
+- Acts as an MCP server exposing multiple tools:
+  - `eval` - Execute JavaScript with access to all MCP tools
+  - `invoke` - Batch invoke tools with parallel/sequential execution
+  - `list_servers` - List connected servers and their tools
+  - `help` - Get documentation for specific tools
+  - `install` - Dynamically add new servers
+  - `open_ui` - Open web interface
 - Connects to multiple upstream MCP servers
 - Transparently forwards root directory information from clients to upstream servers
-- Provides unified JavaScript execution environment
+- Provides unified JavaScript execution environment with $results array
 
 ### CLI Mode
 - Direct command-line interface for server management
@@ -147,6 +155,64 @@ async (arg) => {
   const result = await someServer.someTool({ param: arg.value });
   return result;
 }
+
+// Access previous results via $results array
+() => {
+  console.log("Previous result:", $results[0]);
+  return $results[0];
+}
+```
+
+### $results Array
+
+When using the `eval` or `invoke` tools as an MCP client, results are automatically stored in the `$results` array. Each tool invocation appends its result to this array, and you can access previous results by index:
+
+```javascript
+// After calling invoke or eval, results are stored
+$results[0]  // First result
+$results[1]  // Second result
+```
+
+## Batch Tool Invocation
+
+The `invoke` tool allows you to call multiple MCP tools in batch mode:
+
+```javascript
+// Sequential execution (stops on first error)
+{
+  calls: [
+    { server: "filesystem", tool: "read_file", parameters: { path: "package.json" } },
+    { server: "filesystem", tool: "read_file", parameters: { path: "README.md" } }
+  ],
+  parallel: false
+}
+
+// Parallel execution (all tools execute concurrently)
+{
+  calls: [
+    { server: "filesystem", tool: "list_directory", parameters: { path: "." } },
+    { server: "git", tool: "status", parameters: {} }
+  ],
+  parallel: true
+}
+```
+
+## Logging
+
+When running in server mode, MCPMan redirects console output to log files:
+
+- **Main log**: `~/.mcpman/mcpman.log` - All console.log/error/warn/info output
+- **Trace log**: `~/.mcpman/trace.log` - Detailed trace logging (requires `MCPMAN_TRACE=1`)
+
+Logs use synchronous writes to ensure all messages are captured, even during crashes. Error objects are formatted with full stack traces and causes.
+
+```bash
+# Enable trace logging
+MCPMAN_TRACE=1 bun cli serve
+
+# View logs
+tail -f ~/.mcpman/mcpman.log
+tail -f ~/.mcpman/trace.log
 ```
 
 ## Development

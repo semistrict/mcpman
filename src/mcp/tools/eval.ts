@@ -1,7 +1,9 @@
 import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type { EvalRuntime } from "../../eval/runtime.js";
+import type { ToolManager } from "../tool-manager.js";
 import { TRACE } from "../../utils/logging.js";
+import { validateTypeScript } from "./validation.js";
 
 function truncateResult(text: string, resultsIndex: number, maxLength = 250): string {
   if (text.length <= maxLength) {
@@ -47,6 +49,7 @@ function formatResultOutput(resultsIndex: number, label: string, rawResult: unkn
 export function registerEvalTool(
   mcpServer: McpServer,
   evalRuntime: EvalRuntime,
+  toolManager: ToolManager,
   initializedMcpServer: Promise<McpServer>
 ) {
   TRACE("Registering eval tool");
@@ -55,12 +58,12 @@ export function registerEvalTool(
     {
       title: "JavaScript Evaluator",
       description:
-        "Execute a JavaScript function expression with access to MCP tools. Results from the invoke tool are stored in the $results array.",
+        "Execute a JavaScript function expression with access to MCP tools. Code is validated with TypeScript compiler before execution. Results are stored in the $results array. Use the `vars` object to persist variables across eval calls (e.g., vars.x = 42; return vars.x;)",
       inputSchema: {
         code: z
           .string()
           .describe(
-            "Function expression that optionally accepts a single parameter. Use serverName.toolName(args) to call tools."
+            "Function expression that optionally accepts a single parameter. Use serverName.toolName(args) to call tools. Use vars object to persist state across calls (e.g., vars.x = 42)."
           ),
         arg: z
           .object({})
@@ -71,6 +74,24 @@ export function registerEvalTool(
     },
     async ({ code, arg }) => {
       await initializedMcpServer; // Wait for upstream servers to be connected
+
+      // Validate code with TypeScript before execution
+      const typeDefinitions = await toolManager.getTypeDefinitions();
+      const validation = validateTypeScript(code, typeDefinitions);
+
+      if (!validation.valid) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `TypeScript validation failed. Please fix the errors in your code:\n\n${validation.errors}`,
+            },
+          ],
+          isError: true,
+        };
+      }
+
+      // Execute the validated code
       const result = await evalRuntime.eval(code, arg);
 
       // Combine result and output for storage in $results

@@ -99,11 +99,11 @@ describe('Eval with Argument Test', () => {
 
     const content = result.content as Array<{type: string, text: string}>;
     const helpText = content[0]?.text || '';
-    const helpData = JSON.parse(helpText);
 
-    expect(helpData.server).toBe('filesystem');
-    expect(helpData.tools).toBeInstanceOf(Array);
-    expect(helpData.tools.length).toBeGreaterThan(0);
+    // Should return TypeScript declarations in markdown format
+    expect(helpText).toContain('## Server: filesystem');
+    expect(helpText).toContain('TypeScript Declarations');
+    expect(helpText).toContain('declare const filesystem:');
   });
 
   it('should use help function via eval global context', async () => {
@@ -123,7 +123,7 @@ describe('Eval with Argument Test', () => {
     const result = await client.callTool({
       name: 'eval',
       arguments: {
-        code: 'async () => { const files = await filesystem.list_directory({ path: "." }); return files.length > 0; }',
+        code: 'async () => { const files = await filesystem.listDirectory({ path: "." }); return files.length > 0; }',
       },
     });
 

@@ -114,6 +114,7 @@ export class ToolManager {
     availableTypes += `\ndeclare function listTools(serverName?: string): string[] | Record<string, string[]>;`;
     availableTypes += `\ndeclare function help(serverName: string, toolName?: string): Promise<any>;`;
     availableTypes += `\ndeclare const $results: any[];`;
+    availableTypes += `\ndeclare const vars: any;`;
 
     // Only cache if no server filter was used
     if (!servers) {

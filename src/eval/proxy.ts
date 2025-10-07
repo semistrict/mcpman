@@ -239,5 +239,8 @@ export function createGlobalContext(
     }
   };
 
+  // Add vars object for persisting state across eval calls
+  context.vars = {};
+
   return context;
 }

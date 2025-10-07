@@ -25,7 +25,7 @@ describe('Eval Persistence Integration Test', () => {
     const result1 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => { globalThis.x = 42; return x; }',
+        code: '() => { vars.x = 42; return vars.x; }',
       },
     });
 
@@ -36,7 +36,7 @@ describe('Eval Persistence Integration Test', () => {
     const result2 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => x + 8',
+        code: '() => vars.x + 8',
       },
     });
 
@@ -47,7 +47,7 @@ describe('Eval Persistence Integration Test', () => {
     const result3 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => { x = x + 8; return x; }',
+        code: '() => { vars.x = vars.x + 8; return vars.x; }',
       },
     });
 
@@ -58,7 +58,7 @@ describe('Eval Persistence Integration Test', () => {
     const result4 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => { x = x * 2; return x; }',
+        code: '() => { vars.x = vars.x * 2; return vars.x; }',
       },
     });
 
@@ -71,7 +71,7 @@ describe('Eval Persistence Integration Test', () => {
     const result1 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => { globalThis.add = function(a, b) { return a + b; }; }',
+        code: '() => { vars.add = function(a, b) { return a + b; }; }',
       },
     });
 
@@ -79,7 +79,7 @@ describe('Eval Persistence Integration Test', () => {
     const result2 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => add(10, 20)',
+        code: '() => vars.add(10, 20)',
       },
     });
 
@@ -90,7 +90,7 @@ describe('Eval Persistence Integration Test', () => {
     const result3 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => { globalThis.add = function(a, b) { return a * b; }; }',
+        code: '() => { vars.add = function(a, b) { return a * b; }; }',
       },
     });
 
@@ -98,7 +98,7 @@ describe('Eval Persistence Integration Test', () => {
     const result4 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => add(10, 20)',
+        code: '() => vars.add(10, 20)',
       },
     });
 
@@ -111,7 +111,7 @@ describe('Eval Persistence Integration Test', () => {
     const result1 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => { globalThis.data = { count: 0, items: [] }; return data.count; }',
+        code: '() => { vars.data = { count: 0, items: [] }; return vars.data.count; }',
       },
     });
 
@@ -122,7 +122,7 @@ describe('Eval Persistence Integration Test', () => {
     const result2 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => { data.count++; data.items.push("hello"); return data; }',
+        code: '() => { vars.data.count++; vars.data.items.push("hello"); return vars.data; }',
       },
     });
 
@@ -137,7 +137,7 @@ describe('Eval Persistence Integration Test', () => {
     const result3 = await client.callTool({
       name: 'eval',
       arguments: {
-        code: '() => data.items.length',
+        code: '() => vars.data.items.length',
       },
     });
 

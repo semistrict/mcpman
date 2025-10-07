@@ -80,9 +80,9 @@ function registerTools(
 ) {
   TRACE("Registering MCP server tools...");
   registerCodeTool(mcpServer, toolManager, initializedMcpServer);
-  registerEvalTool(mcpServer, evalRuntime, initializedMcpServer);
+  registerEvalTool(mcpServer, evalRuntime, toolManager, initializedMcpServer);
   registerListServersTool(mcpServer, upstreamServerManager, initializedMcpServer);
-  registerHelpTool(mcpServer, upstreamServerManager, initializedMcpServer);
+  registerHelpTool(mcpServer, upstreamServerManager, toolManager, initializedMcpServer);
   registerInvokeTool(mcpServer, toolManager, initializedMcpServer);
   registerInstallTool(mcpServer, upstreamServerManager, initializedMcpServer);
   TRACE("All tools registered successfully");

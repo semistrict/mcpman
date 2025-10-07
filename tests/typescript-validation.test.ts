@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateTypeScript } from '../src/mcp/tools/code.js';
+import { validateTypeScript } from '../src/mcp/tools/validation.js';
 
 describe('TypeScript Validation', () => {
   it('should accept valid TypeScript code', () => {

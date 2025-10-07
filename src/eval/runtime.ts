@@ -62,6 +62,16 @@ export class EvalRuntime {
     };
   }
 
+  appendResult(result: unknown): number {
+    if (!this.vmContext) {
+      throw new Error("VM context not initialized");
+    }
+    // Access $results from vmContext and push the new result
+    const results = this.vmContext.$results as unknown[];
+    results.push(result);
+    return results.length - 1;
+  }
+
   private async initializeContext(): Promise<void> {
     // Create proxies for all connected servers
     const proxies = await createServerProxies(this.upstreamServerManager);
@@ -92,6 +102,8 @@ export class EvalRuntime {
       clearInterval,
       Promise,
       process: { env: process.env },
+      // Results array for invoke tool
+      $results: [],
     };
 
     this.vmContext = vm.createContext(vmContextData);

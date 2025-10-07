@@ -165,7 +165,7 @@ function registerTools(
     },
     async ({ calls, parallel }) => {
       await initializedMcpServer; // Wait for upstream servers to be connected
-      return await handleInvoke(upstreamServerManager, calls, parallel);
+      return await handleInvoke(upstreamServerManager, evalRuntime, calls, parallel);
     }
   );
   TRACE("Invoke tool registered");
@@ -324,13 +324,19 @@ async function handleHelp(
 
 async function handleInvoke(
   upstreamServerManager: UpstreamServerManager,
+  evalRuntime: EvalRuntime,
   calls: Array<{ server: string; tool: string; parameters?: unknown }>,
   parallel: boolean
 ) {
   const invokeSingle = async (
     call: { server: string; tool: string; parameters?: unknown },
     index: number
-  ): Promise<{ success: boolean; result: { type: "text"; text: string } }> => {
+  ): Promise<{
+    success: boolean;
+    result: { type: "text"; text: string };
+    toolResult?: unknown;
+    resultsIndex?: number;
+  }> => {
     const { server: serverName, tool: toolName, parameters } = call;
     const heading = `\n## [${index}] ${serverName}.${toolName}\n`;
 
@@ -375,6 +381,9 @@ async function handleInvoke(
             validatedParams
           );
 
+          // Append to $results and get the index
+          const resultsIndex = evalRuntime.appendResult(toolResult);
+
           const resultText = Array.isArray(toolResult)
             ? toolResult
                 .map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
@@ -385,8 +394,10 @@ async function handleInvoke(
             success: true,
             result: {
               type: "text" as const,
-              text: `${heading}${resultText}`,
+              text: `${heading}Result saved to $results[${resultsIndex}]\n\n${resultText}`,
             },
+            toolResult,
+            resultsIndex,
           };
         } catch (error) {
           if (error instanceof z.ZodError) {
@@ -404,6 +415,9 @@ async function handleInvoke(
         // No schema to validate against, call directly
         const toolResult = await upstreamServerManager.callTool(serverName, toolName, parameters);
 
+        // Append to $results and get the index
+        const resultsIndex = evalRuntime.appendResult(toolResult);
+
         const resultText = Array.isArray(toolResult)
           ? toolResult
               .map((item) => (item.type === "text" ? item.text : JSON.stringify(item)))
@@ -414,8 +428,10 @@ async function handleInvoke(
           success: true,
           result: {
             type: "text" as const,
-            text: `${heading}${resultText}`,
+            text: `${heading}Result saved to $results[${resultsIndex}]\n\n${resultText}`,
           },
+          toolResult,
+          resultsIndex,
         };
       }
     } catch (error) {
